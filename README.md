@@ -1,6 +1,10 @@
 # TimeTracker
 
+> **[github.com/kitakun/TimeTracker](https://github.com/kitakun/TimeTracker)**
+
 A lightweight, privacy-first desktop time tracker built with **Tauri 2 + Rust + React/TypeScript**.
+
+![TimeTracker preview](docs/Screenshot_1.png)
 
 Tracks what you work on automatically — by watching the active window and open IDE workspaces — and lets you review, annotate, and optionally publish worklogs to Jira.
 
@@ -60,6 +64,18 @@ If you're lazy enough to want automatic worklog publishing:
 | **Boards** | Enable / disable Jira integration |
 | **Jira Key Patterns** | Regex patterns to extract issue keys from branch names |
 | **Storage** | DB file size, session count, *Erase all sessions* |
+
+---
+
+## Platform support
+
+| Platform | Builds | UI | Window tracking | Idle detection | Huddle detection |
+|---|---|---|---|---|---|
+| 🪟 Windows | ✅ Tested | ✅ | ✅ | ✅ | ✅ |
+| 🍎 macOS | ✅ Should compile | ✅ | 🔲 Not implemented | 🔲 Not implemented | 🔲 Not implemented |
+| 🐧 Linux | ✅ Should compile | ✅ | 🔲 Not implemented | 🔲 Not implemented | 🔲 Not implemented |
+
+On macOS and Linux the app builds and runs — sessions, Jira publishing, and the UI all work — but automatic tracking won't fire because the OS-level window/idle APIs are stubs. PRs welcome.
 
 ---
 

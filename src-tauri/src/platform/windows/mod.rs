@@ -1,4 +1,4 @@
-use super::types::{ActiveWindowInfo, HuddleInfo};
+use crate::platform::types::{ActiveWindowInfo, HuddleInfo};
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, MAX_PATH};
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetForegroundWindow, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,

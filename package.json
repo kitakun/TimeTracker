@@ -1,7 +1,9 @@
 {
-  "name": "tauri-app",
+  "name": "timetracker",
   "private": true,
   "version": "0.1.0",
+  "repository": "https://github.com/kitakun/TimeTracker",
+  "homepage": "https://github.com/kitakun/TimeTracker",
   "type": "module",
   "scripts": {
     "dev": "vite",

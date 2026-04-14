@@ -1,46 +1,43 @@
 pub mod types;
 
-#[cfg(target_os = "windows")]
-pub mod windows;
+// ── OS-specific implementations ───────────────────────────────────────────────
+// Each sub-module exposes the same four functions; only one is compiled.
 
-#[cfg(not(target_os = "windows"))]
-pub mod stub;
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "linux")]
+mod linux;
+
+#[cfg(target_os = "windows")]
+use windows as imp;
+#[cfg(target_os = "macos")]
+use macos as imp;
+#[cfg(target_os = "linux")]
+use linux as imp;
 
 use types::{ActiveWindowInfo, HuddleInfo};
 
+// ── Public API ────────────────────────────────────────────────────────────────
+
 /// Get the currently focused window.
 pub fn get_active_window() -> Option<ActiveWindowInfo> {
-    #[cfg(target_os = "windows")]
-    return windows::get_active_window();
-
-    #[cfg(not(target_os = "windows"))]
-    return stub::get_active_window();
+    imp::get_active_window()
 }
 
-/// Get seconds since last user input (keyboard/mouse).
+/// Seconds since the last keyboard or mouse input.
 pub fn get_idle_seconds() -> u64 {
-    #[cfg(target_os = "windows")]
-    return windows::get_idle_seconds();
-
-    #[cfg(not(target_os = "windows"))]
-    return stub::get_idle_seconds();
+    imp::get_idle_seconds()
 }
 
-/// Return all visible windows owned by known IDE processes (VS Code, Rider, etc.).
-/// Used to detect active project context even when the IDE is not focused.
+/// All visible windows owned by known IDE processes (VS Code, Rider, Cursor, …).
+/// Used to detect the active project even when the IDE is not focused.
 pub fn list_ide_windows() -> Vec<ActiveWindowInfo> {
-    #[cfg(target_os = "windows")]
-    return windows::list_ide_windows();
-
-    #[cfg(not(target_os = "windows"))]
-    return stub::list_ide_windows();
+    imp::list_ide_windows()
 }
 
-/// Scan all visible windows for an active Slack Huddle.
+/// The active Slack Huddle window, if any.
 pub fn get_huddle_window() -> Option<HuddleInfo> {
-    #[cfg(target_os = "windows")]
-    return windows::get_huddle_window();
-
-    #[cfg(not(target_os = "windows"))]
-    return stub::get_huddle_window();
+    imp::get_huddle_window()
 }
