@@ -1,7 +1,7 @@
 {
   "name": "timetracker",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.0-alpha",
   "repository": "https://github.com/kitakun/TimeTracker",
   "homepage": "https://github.com/kitakun/TimeTracker",
   "type": "module",
