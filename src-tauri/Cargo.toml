@@ -1,6 +1,6 @@
 [package]
 name = "timetracker"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 description = "Privacy-first desktop time tracker with optional Jira integration"
 authors = ["kitakun"]
 repository = "https://github.com/kitakun/TimeTracker"
@@ -35,6 +35,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
 base64 = "0.22"
 once_cell = "1"
+semver = "1"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [

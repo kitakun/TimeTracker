@@ -4587,7 +4587,7 @@ dependencies = [
 
 [[package]]
 name = "timetracker"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4597,6 +4597,7 @@ dependencies = [
  "regex",
  "reqwest 0.12.28",
  "rusqlite",
+ "semver",
  "serde",
  "serde_json",
  "tauri",

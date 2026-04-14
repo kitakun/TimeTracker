@@ -20,6 +20,7 @@ pub fn save_settings(
     let mut monitor = state.monitor.lock().map_err(|e| e.to_string())?;
     monitor.config.idle_threshold_secs = settings.idle_threshold_secs;
     monitor.config.poll_interval_secs = settings.poll_interval_secs;
+    monitor.set_idle_detection_enabled(settings.idle_detection_enabled);
 
     Ok(())
 }

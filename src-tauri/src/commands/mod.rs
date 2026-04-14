@@ -4,3 +4,4 @@ pub mod jira;
 pub mod settings;
 pub mod tracking;
 pub mod storage;
+pub mod update;

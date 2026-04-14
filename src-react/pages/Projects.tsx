@@ -21,14 +21,33 @@ export default function Projects() {
   }, []);
 
   async function pickFolder() {
-    const selected = await open({ directory: true, multiple: false });
-    if (typeof selected === "string") {
-      const dirName = selected.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
+    const selected = await open({ directory: true, multiple: true });
+    if (!selected) return;
+    const paths = Array.isArray(selected) ? selected : [selected];
+    if (paths.length === 0) return;
+
+    if (paths.length === 1) {
+      // Single folder: fill the form as before
+      const dirName = paths[0].replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
       setForm((f) => ({
         ...f,
-        path: selected,
+        path: paths[0],
         name: f.name.trim() === "" ? dirName : f.name,
       }));
+    } else {
+      // Multiple folders: create each project immediately and reload
+      setError(null);
+      try {
+        for (const p of paths) {
+          const dirName = p.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
+          await createProject({ name: dirName, path: p, color: COLORS[Math.floor(Math.random() * COLORS.length)] });
+        }
+        setAdding(false);
+        setForm({ name: "", path: "", color: COLORS[0] });
+        await reload();
+      } catch (e) {
+        setError(String(e));
+      }
     }
   }
 

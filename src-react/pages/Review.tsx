@@ -7,12 +7,85 @@ import {
 import { formatDurationHuman, formatTime, totalDurationSecs } from "../lib/utils";
 import { useI18n } from "../lib/i18n";
 import {
-  ChevronLeft, ChevronRight, Send, Trash2, Edit2, Check, X, Phone
+  ChevronLeft, ChevronRight, Send, Trash2, Edit2, Check, X, Phone, Timer
 } from "lucide-react";
+
+// ── Issue grouping ────────────────────────────────────────────────────────────
+
+interface IssueGroup {
+  displayKey: string;
+  isManual: boolean;
+  isHuddle: boolean;
+  totalSecs: number;
+  sessionCount: number;
+  publishedCount: number;
+  projectIds: string[];
+}
+
+function buildIssueGroups(sessions: MergedSession[]): IssueGroup[] {
+  const map = new Map<string, IssueGroup>();
+
+  for (const s of sessions) {
+    let displayKey: string;
+    let isManual = false;
+    let isHuddle = false;
+
+    if (s.is_manual && s.window_title) {
+      displayKey = s.window_title;
+      isManual = true;
+    } else if (s.is_huddle) {
+      displayKey = s.huddle_channel ? `#${s.huddle_channel}` : "Huddle";
+      isHuddle = true;
+    } else if (s.jira_key) {
+      displayKey = s.jira_key;
+    } else {
+      displayKey = "—";
+    }
+
+    const existing = map.get(displayKey);
+    if (existing) {
+      existing.totalSecs += s.duration_secs;
+      existing.sessionCount += 1;
+      if (s.is_published) existing.publishedCount += 1;
+      if (s.project_id && !existing.projectIds.includes(s.project_id)) {
+        existing.projectIds.push(s.project_id);
+      }
+    } else {
+      map.set(displayKey, {
+        displayKey,
+        isManual,
+        isHuddle,
+        totalSecs: s.duration_secs,
+        sessionCount: 1,
+        publishedCount: s.is_published ? 1 : 0,
+        projectIds: s.project_id ? [s.project_id] : [],
+      });
+    }
+  }
+
+  // Sort: jira keys first (uppercase), then manual, then huddle, then "—" last
+  return [...map.values()].sort((a, b) => {
+    if (a.displayKey === "—") return 1;
+    if (b.displayKey === "—") return -1;
+    if (a.isManual !== b.isManual) return a.isManual ? 1 : -1;
+    if (a.isHuddle !== b.isHuddle) return a.isHuddle ? 1 : -1;
+    return b.totalSecs - a.totalSecs;
+  });
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Review() {
   const { t } = useI18n();
-  const [date, setDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [date, setDate] = useState(() => {
+    return localStorage.getItem("review:date") ?? format(new Date(), "yyyy-MM-dd");
+  });
+
+  const setDateAndSave = (d: string) => {
+    setDate(d);
+    localStorage.setItem("review:date", d);
+  };
+
   const [sessions, setSessions] = useState<MergedSession[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [publishing, setPublishing] = useState<Record<number, boolean>>({});
@@ -31,8 +104,8 @@ export default function Review() {
 
   useEffect(() => { reload(); }, [reload]);
 
-  const prevDay = () => setDate(format(subDays(new Date(date), 1), "yyyy-MM-dd"));
-  const nextDay = () => setDate(format(subDays(new Date(date), -1), "yyyy-MM-dd"));
+  const prevDay = () => setDateAndSave(format(subDays(new Date(date), 1), "yyyy-MM-dd"));
+  const nextDay = () => setDateAndSave(format(subDays(new Date(date), -1), "yyyy-MM-dd"));
 
   const projById = (id: string | null) => projects.find((p) => p.id === id);
 
@@ -76,6 +149,7 @@ export default function Review() {
   const unpublished = sessions.filter((s) => !s.is_published);
   const total = totalDurationSecs(sessions);
   const unpublishedTotal = totalDurationSecs(unpublished);
+  const issueGroups = buildIssueGroups(sessions);
 
   return (
     <div className="page">
@@ -90,7 +164,7 @@ export default function Review() {
             type="date"
             className="date-input"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => setDateAndSave(e.target.value)}
           />
           <button className="btn btn-ghost btn-icon" onClick={nextDay}><ChevronRight size={16} /></button>
         </div>
@@ -127,122 +201,200 @@ export default function Review() {
       {sessions.length === 0 ? (
         <div className="card"><div className="empty">{t("review.noSessions")}</div></div>
       ) : (
-        <div className="card review-card">
-          <div className="review-table-wrap">
-            <table className="review-table">
-              <thead>
-                <tr>
-                  <th>{t("review.colTime")}</th>
-                  <th>{t("review.colDuration")}</th>
-                  <th>{t("review.colIssue")}</th>
-                  <th>{t("review.colBranch")}</th>
-                  <th>{t("review.colProject")}</th>
-                  <th>{t("review.colNotes")}</th>
-                  <th>{t("review.colStatus")}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {sessions.map((s, i) => {
-                  const proj = projById(s.project_id);
-                  const isEditing = editing === i;
-                  return (
-                    <tr key={i} className={`${s.is_published ? "row-published" : ""} ${s.is_huddle ? "row-huddle" : ""}`}>
-                      <td className="cell-time">
-                        {formatTime(s.start_time)}–{s.end_time ? formatTime(s.end_time) : "…"}
-                      </td>
-                      <td>
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            className="inline-input"
-                            style={{ width: 70 }}
-                            value={Math.round(editBuf.duration_secs / 60)}
-                            onChange={(e) => setEditBuf((b) => ({ ...b, duration_secs: Number(e.target.value) * 60 }))}
-                          />
-                        ) : (
-                          formatDurationHuman(s.duration_secs)
-                        )}
-                      </td>
-                      <td>
-                        {isEditing ? (
-                          <input
-                            className="inline-input"
-                            value={editBuf.jira_key}
-                            placeholder="PROJ-123"
-                            onChange={(e) => setEditBuf((b) => ({ ...b, jira_key: e.target.value.toUpperCase() }))}
-                          />
-                        ) : s.is_huddle ? (
-                          <span className="huddle-badge">
-                            <Phone size={10} /> {s.huddle_channel ? `#${s.huddle_channel}` : "Huddle"}
-                          </span>
-                        ) : s.jira_key ? (
-                          <span className="jira-badge">{s.jira_key}</span>
-                        ) : (
-                          <span className="text-muted">–</span>
-                        )}
-                      </td>
-                      <td className="text-muted cell-branch">{s.branch?.slice(0, 30) ?? "–"}</td>
-                      <td>
-                        {proj && (
-                          <span className="proj-badge" style={{ backgroundColor: proj.color + "22", color: proj.color }}>
-                            {proj.name}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {isEditing ? (
-                          <input
-                            className="inline-input"
-                            value={editBuf.notes}
-                            placeholder="notes…"
-                            onChange={(e) => setEditBuf((b) => ({ ...b, notes: e.target.value }))}
-                          />
-                        ) : (
-                          <span className="text-muted">{s.notes ?? ""}</span>
-                        )}
-                      </td>
-                      <td>
-                        {s.is_published ? (
-                          <span className="published-badge">{t("review.statusPublished")}</span>
-                        ) : (
-                          <span className="unpublished-badge">{t("review.statusPending")}</span>
-                        )}
-                      </td>
-                      <td>
-                        <div className="row-actions">
-                          {isEditing ? (
-                            <>
-                              <button className="btn-icon text-green" title={t("review.titleSave")} onClick={() => saveEdit(s)}><Check size={14} /></button>
-                              <button className="btn-icon text-muted" title={t("review.titleCancel")} onClick={() => setEditing(null)}><X size={14} /></button>
-                            </>
-                          ) : (
-                            <>
-                              {!s.is_published && (
-                                <>
-                                  <button className="btn-icon" title={t("review.titleEdit")} onClick={() => startEdit(i, s)}><Edit2 size={13} /></button>
-                                  <button
-                                    className="btn-icon text-blue"
-                                    title={t("review.titlePublish")}
-                                    disabled={!s.jira_key || publishing[i]}
-                                    onClick={() => handlePublish(i, s)}
-                                  >
-                                    <Send size={13} />
-                                  </button>
-                                  <button className="btn-icon text-red" title={t("review.titleDelete")} onClick={() => handleDelete(s)}><Trash2 size={13} /></button>
-                                </>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </td>
+        <>
+          {/* ── By-Issue summary ───────────────────────────────────────────── */}
+          {issueGroups.length > 0 && (
+            <div className="card mb-4">
+              <div className="card-title">{t("review.byIssue")}</div>
+              <div className="review-table-wrap">
+                <table className="review-table issue-summary-table">
+                  <thead>
+                    <tr>
+                      <th>{t("review.colIssue")}</th>
+                      <th>{t("review.colProject")}</th>
+                      <th>{t("review.colDuration")}</th>
+                      <th>{t("review.colStatus")}</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {issueGroups.map((g) => {
+                      const allPublished = g.publishedCount === g.sessionCount;
+                      const somePublished = g.publishedCount > 0 && !allPublished;
+                      return (
+                        <tr key={g.displayKey}>
+                          <td>
+                            {g.isManual ? (
+                              <span className="manual-badge">
+                                <Timer size={10} /> {g.displayKey}
+                              </span>
+                            ) : g.isHuddle ? (
+                              <span className="huddle-badge">
+                                <Phone size={10} /> {g.displayKey}
+                              </span>
+                            ) : g.displayKey === "—" ? (
+                              <span className="text-muted">—</span>
+                            ) : (
+                              <span className="jira-badge">{g.displayKey}</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="issue-summary-projects">
+                              {g.projectIds.map((pid) => {
+                                const proj = projById(pid);
+                                return proj ? (
+                                  <span key={pid} className="proj-badge" style={{ backgroundColor: proj.color + "22", color: proj.color }}>
+                                    {proj.name}
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
+                          </td>
+                          <td className="issue-summary-dur">
+                            <span className="issue-summary-dur-value">{formatDurationHuman(g.totalSecs)}</span>
+                            <span className="issue-summary-sessions">{g.sessionCount}</span>
+                          </td>
+                          <td>
+                            {allPublished ? (
+                              <span className="published-badge">{t("review.summaryAllPublished")}</span>
+                            ) : somePublished ? (
+                              <span className="partial-badge">
+                                {t("review.summaryPublished", { done: g.publishedCount, total: g.sessionCount })}
+                              </span>
+                            ) : (
+                              <span className="unpublished-badge">{t("review.statusPending")}</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ── Full sessions table ────────────────────────────────────────── */}
+          <div className="card review-card">
+            <div className="review-table-wrap">
+              <table className="review-table">
+                <thead>
+                  <tr>
+                    <th>{t("review.colTime")}</th>
+                    <th>{t("review.colDuration")}</th>
+                    <th>{t("review.colIssue")}</th>
+                    <th>{t("review.colBranch")}</th>
+                    <th>{t("review.colProject")}</th>
+                    <th>{t("review.colNotes")}</th>
+                    <th>{t("review.colStatus")}</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessions.map((s, i) => {
+                    const proj = projById(s.project_id);
+                    const isEditing = editing === i;
+                    return (
+                      <tr key={i} className={`${s.is_published ? "row-published" : ""} ${s.is_huddle ? "row-huddle" : ""}`}>
+                        <td className="cell-time">
+                          {formatTime(s.start_time)}–{s.end_time ? formatTime(s.end_time) : "…"}
+                        </td>
+                        <td>
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              className="inline-input"
+                              style={{ width: 70 }}
+                              value={Math.round(editBuf.duration_secs / 60)}
+                              onChange={(e) => setEditBuf((b) => ({ ...b, duration_secs: Number(e.target.value) * 60 }))}
+                            />
+                          ) : (
+                            formatDurationHuman(s.duration_secs)
+                          )}
+                        </td>
+                        <td>
+                          {isEditing ? (
+                            <input
+                              className="inline-input"
+                              value={editBuf.jira_key}
+                              placeholder="PROJ-123"
+                              onChange={(e) => setEditBuf((b) => ({ ...b, jira_key: e.target.value.toUpperCase() }))}
+                            />
+                          ) : s.is_manual ? (
+                            <span className="manual-badge">
+                              <Timer size={10} /> {s.window_title ?? "–"}
+                            </span>
+                          ) : s.is_huddle ? (
+                            <span className="huddle-badge">
+                              <Phone size={10} /> {s.huddle_channel ? `#${s.huddle_channel}` : "Huddle"}
+                            </span>
+                          ) : s.jira_key ? (
+                            <span className="jira-badge">{s.jira_key}</span>
+                          ) : (
+                            <span className="text-muted">–</span>
+                          )}
+                        </td>
+                        <td className="text-muted cell-branch">{s.branch?.slice(0, 30) ?? "–"}</td>
+                        <td>
+                          {proj && (
+                            <span className="proj-badge" style={{ backgroundColor: proj.color + "22", color: proj.color }}>
+                              {proj.name}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {isEditing ? (
+                            <input
+                              className="inline-input"
+                              value={editBuf.notes}
+                              placeholder="notes…"
+                              onChange={(e) => setEditBuf((b) => ({ ...b, notes: e.target.value }))}
+                            />
+                          ) : (
+                            <span className="text-muted">{s.notes ?? ""}</span>
+                          )}
+                        </td>
+                        <td>
+                          {s.is_published ? (
+                            <span className="published-badge">{t("review.statusPublished")}</span>
+                          ) : (
+                            <span className="unpublished-badge">{t("review.statusPending")}</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="row-actions">
+                            {isEditing ? (
+                              <>
+                                <button className="btn-icon text-green" title={t("review.titleSave")} onClick={() => saveEdit(s)}><Check size={14} /></button>
+                                <button className="btn-icon text-muted" title={t("review.titleCancel")} onClick={() => setEditing(null)}><X size={14} /></button>
+                              </>
+                            ) : (
+                              <>
+                                {!s.is_published && (
+                                  <>
+                                    <button className="btn-icon" title={t("review.titleEdit")} onClick={() => startEdit(i, s)}><Edit2 size={13} /></button>
+                                    <button
+                                      className="btn-icon text-blue"
+                                      title={t("review.titlePublish")}
+                                      disabled={!s.jira_key || publishing[i]}
+                                      onClick={() => handlePublish(i, s)}
+                                    >
+                                      <Send size={13} />
+                                    </button>
+                                    <button className="btn-icon text-red" title={t("review.titleDelete")} onClick={() => handleDelete(s)}><Trash2 size={13} /></button>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

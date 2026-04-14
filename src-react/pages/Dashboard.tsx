@@ -2,13 +2,13 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import {
   listMergedSessionsForDay, listSessionsForDay, listProjects, updateSession, startManualSession,
-  MergedSession, Project, ActivitySnapshot, HuddleStatus, Session,
+  deleteSession, MergedSession, Project, ActivitySnapshot, HuddleStatus, Session,
 } from "../lib/tauri";
 import { formatDurationHuman, formatTime, todayDate, totalDurationSecs } from "../lib/utils";
 import { useI18n } from "../lib/i18n";
 import { useTrackingState } from "../hooks/useTrackingState";
 import { useToast } from "../lib/toast";
-import { RefreshCw, Clock, Tag, GitBranch, Pause, Play, Phone, Edit2, Check, X, Loader2, Square, Timer } from "lucide-react";
+import { RefreshCw, Clock, Tag, GitBranch, Pause, Play, Phone, Edit2, Check, X, Loader2, Square, Timer, Trash2 } from "lucide-react";
 
 function formatElapsed(secs: number): string {
   const h = Math.floor(secs / 3600);
@@ -127,6 +127,11 @@ export default function Dashboard() {
   function cancelEdit() {
     setEditingIdx(null);
     setNoteBuf("");
+  }
+
+  async function handleDeleteSession(s: MergedSession) {
+    for (const id of s.session_ids) await deleteSession(id);
+    await reload();
   }
 
   // ── Manual session handlers ───────────────────────────────────────────────
@@ -451,6 +456,15 @@ export default function Dashboard() {
                   )}
                   {s.is_published && <span className="published-badge">{t("dashboard.published")}</span>}
                   {isLive && !s.is_manual && <span className="live-badge">● live</span>}
+                  {s.end_time && !s.is_published && (
+                    <button
+                      className="btn-icon text-red session-delete-btn"
+                      title={t("dashboard.deleteSession")}
+                      onClick={() => handleDeleteSession(s)}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
                 </div>
               );
             })}

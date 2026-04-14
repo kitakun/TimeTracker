@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::modules::git_probe::JiraKeyPattern;
 
 fn default_track_slack_huddles() -> bool { true }
+fn default_true() -> bool { true }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -20,6 +21,14 @@ pub struct AppSettings {
     /// Whether the Jira integration is enabled (default: false).
     #[serde(default)]
     pub jira_enabled: bool,
+    /// Whether idle detection is active (default: true). When false, tracking
+    /// never enters the Idle state automatically — only a manual pause stops it.
+    #[serde(default = "default_true")]
+    pub idle_detection_enabled: bool,
+    /// When true, the app will resume the previous open session after a short
+    /// restart or wake-from-sleep (gap < 1 hour) instead of creating a new one.
+    #[serde(default)]
+    pub auto_merge_enabled: bool,
 }
 
 impl Default for AppSettings {
@@ -32,6 +41,8 @@ impl Default for AppSettings {
             minimize_to_tray: true,
             track_slack_huddles: true,
             jira_enabled: false,
+            idle_detection_enabled: true,
+            auto_merge_enabled: false,
         }
     }
 }

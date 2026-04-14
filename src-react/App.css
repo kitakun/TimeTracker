@@ -156,6 +156,23 @@ code { font-family: "Cascadia Code", "Consolas", monospace; font-size: 0.9em; ba
   flex-shrink: 0;
 }
 
+.version-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.version-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.version-update-btn {
+  white-space: nowrap;
+}
+
 .btn-sm {
   padding: 4px 10px;
   font-size: 12px;
@@ -173,6 +190,7 @@ code { font-family: "Cascadia Code", "Consolas", monospace; font-size: 0.9em; ba
   margin-bottom: 16px;
 }
 .card-title { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+.card-subtitle { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
 
 .card-row { display: flex; gap: 12px; margin-bottom: 16px; }
 .stat-card {
@@ -296,6 +314,8 @@ button { cursor: pointer; font-family: inherit; font-size: 13px; border: none; }
 }
 .session-row:hover { background: var(--border); }
 .session-row--published { opacity: 0.65; }
+.session-delete-btn { opacity: 0; transition: opacity 0.15s; margin-left: 2px; }
+.session-row:hover .session-delete-btn { opacity: 1; }
 .session-time { display: flex; align-items: center; gap: 5px; color: var(--text-muted); font-size: 12px; min-width: 100px; }
 .session-meta { flex: 1; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .session-dur { font-weight: 600; font-size: 13px; color: var(--text); min-width: 40px; text-align: right; }
@@ -328,7 +348,7 @@ button { cursor: pointer; font-family: inherit; font-size: 13px; border: none; }
 }
 .session-note-empty {
   font-size: 12px;
-  color: var(--border);
+  color: var(--text-muted);
   font-style: italic;
 }
 .session-note-edit-icon {
@@ -609,6 +629,17 @@ button { cursor: pointer; font-family: inherit; font-size: 13px; border: none; }
 .cell-time { white-space: nowrap; color: var(--text-muted); }
 .cell-branch { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-actions { display: flex; gap: 4px; align-items: center; }
+
+/* ── Issue summary table ──────────────────────────────────────────────────── */
+.issue-summary-table { table-layout: auto; }
+.issue-summary-table td:first-child { width: 35%; }
+.issue-summary-projects { display: flex; flex-wrap: wrap; gap: 4px; }
+.issue-summary-dur { white-space: nowrap; }
+.issue-summary-dur-value { font-weight: 600; color: var(--text); margin-right: 8px; }
+.issue-summary-sessions { font-size: 11px; color: var(--text-muted); }
+.issue-summary-sessions::before { content: "("; }
+.issue-summary-sessions::after { content: ")"; }
+.partial-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 500; background: #78350f33; color: #f59e0b; }
 
 /* ── Forms ────────────────────────────────────────────────────────────────── */
 .form-grid { display: flex; flex-direction: column; gap: 14px; }

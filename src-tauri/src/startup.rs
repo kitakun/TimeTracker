@@ -39,15 +39,20 @@ pub fn try_init(data_dir: &Path) -> Result<InitResult> {
     let conn = crate::db::open(&db_path)
         .with_context(|| format!("db::open failed for {db_path:?}"))?;
 
-    // Step 3 – close sessions that were left open by the previous run
+    // Step 3 – settings (must be loaded before orphan cleanup so auto_merge
+    // behaviour is respected on the very first restart after enabling it).
+    let settings = settings_manager::load(&conn).unwrap_or_default();
+
+    // Step 4 – close sessions that were left open by the previous run
     // (crash, forced kill, or clean exit before the loop could finalise them).
     // Errors here are non-fatal; we log but continue.
-    if let Err(e) = session_store::close_orphaned_sessions(&conn, crate::MIN_SESSION_SECS) {
+    if let Err(e) = session_store::close_orphaned_sessions(
+        &conn,
+        crate::MIN_SESSION_SECS,
+        settings.auto_merge_enabled,
+    ) {
         eprintln!("[startup] close_orphaned_sessions failed: {e:#}");
     }
-
-    // Step 4 – settings (graceful default on any error)
-    let settings = settings_manager::load(&conn).unwrap_or_default();
 
     // Step 5 – monitor config
     let config = MonitorConfig {
@@ -57,6 +62,7 @@ pub fn try_init(data_dir: &Path) -> Result<InitResult> {
 
     // Step 6 – state
     let monitor = ActivityMonitor::new(config.clone());
+    monitor.set_idle_detection_enabled(settings.idle_detection_enabled);
     let state = AppState {
         db: Mutex::new(conn),
         monitor: Mutex::new(monitor),

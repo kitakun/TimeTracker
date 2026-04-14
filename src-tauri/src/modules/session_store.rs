@@ -157,16 +157,90 @@ pub fn delete_session(conn: &Connection, id: &str) -> Result<()> {
 
 /// Called once on startup to clean up sessions that were left open by a
 /// previous run (crash, forced kill, or clean exit that skipped finalisation).
-pub fn close_orphaned_sessions(conn: &Connection, min_secs: i64) -> Result<()> {
-    conn.execute(
-        "UPDATE sessions
-         SET end_time = strftime('%Y-%m-%dT%H:%M:%SZ',
-                         datetime(start_time, '+' || duration_secs || ' seconds'))
-         WHERE end_time IS NULL AND duration_secs >= ?1",
-        params![min_secs],
-    )?;
-    conn.execute("DELETE FROM sessions WHERE end_time IS NULL", [])?;
+///
+/// When `auto_merge` is true, the single most recently active non-manual
+/// session whose gap (now − last_heartbeat) is less than 1 hour is left
+/// open so the tracking loop can resume it instead of creating a new
+/// fragmented session.  All other orphaned sessions are still closed/deleted
+/// as usual.
+pub fn close_orphaned_sessions(conn: &Connection, min_secs: i64, auto_merge: bool) -> Result<()> {
+    if !auto_merge {
+        conn.execute(
+            "UPDATE sessions
+             SET end_time = strftime('%Y-%m-%dT%H:%M:%SZ',
+                             datetime(start_time, '+' || duration_secs || ' seconds'))
+             WHERE end_time IS NULL AND duration_secs >= ?1",
+            params![min_secs],
+        )?;
+        conn.execute("DELETE FROM sessions WHERE end_time IS NULL", [])?;
+        return Ok(());
+    }
+
+    // Auto-merge mode — find the single best candidate to resume:
+    // non-manual, gap < 3600 s, most recently active.
+    const MERGE_WINDOW: i64 = 3600;
+    let now_secs = chrono::Utc::now().timestamp();
+
+    let resumable_id: Option<String> = {
+        let result = conn.query_row(
+            "SELECT id FROM sessions
+             WHERE end_time IS NULL AND is_manual = 0
+               AND (?1 - (CAST(strftime('%s', start_time) AS INTEGER) + duration_secs)) < ?2
+             ORDER BY (CAST(strftime('%s', start_time) AS INTEGER) + duration_secs) DESC
+             LIMIT 1",
+            params![now_secs, MERGE_WINDOW],
+            |r| r.get::<_, String>(0),
+        );
+        match result {
+            Ok(id) => Some(id),
+            Err(rusqlite::Error::QueryReturnedNoRows) => None,
+            Err(e) => return Err(e.into()),
+        }
+    };
+
+    match resumable_id {
+        Some(ref keep_id) => {
+            // Close/delete all orphaned sessions except the resumable one.
+            conn.execute(
+                "UPDATE sessions
+                 SET end_time = strftime('%Y-%m-%dT%H:%M:%SZ',
+                                 datetime(start_time, '+' || duration_secs || ' seconds'))
+                 WHERE end_time IS NULL AND duration_secs >= ?1 AND id != ?2",
+                params![min_secs, keep_id],
+            )?;
+            conn.execute(
+                "DELETE FROM sessions WHERE end_time IS NULL AND id != ?1",
+                params![keep_id],
+            )?;
+        }
+        None => {
+            // No resumable session; fall back to original behaviour.
+            conn.execute(
+                "UPDATE sessions
+                 SET end_time = strftime('%Y-%m-%dT%H:%M:%SZ',
+                                 datetime(start_time, '+' || duration_secs || ' seconds'))
+                 WHERE end_time IS NULL AND duration_secs >= ?1",
+                params![min_secs],
+            )?;
+            conn.execute("DELETE FROM sessions WHERE end_time IS NULL", [])?;
+        }
+    }
+
     Ok(())
+}
+
+/// Find an existing open (non-manual) session for the given project that was
+/// left open by the previous run.  Used by the auto-merge tracking path.
+pub fn find_resumable_session(conn: &Connection, project_id: &str) -> Result<Option<Session>> {
+    let sql = format!(
+        "SELECT {COLS} FROM sessions
+         WHERE end_time IS NULL AND is_manual = 0 AND project_id = ?1
+         ORDER BY start_time DESC
+         LIMIT 1"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let mut rows = stmt.query_map(params![project_id], map_row)?;
+    Ok(rows.next().transpose()?)
 }
 
 fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Session> {

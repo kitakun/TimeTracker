@@ -132,29 +132,56 @@ pub fn run() {
                                     }
                                 };
 
-                            let input = CreateSessionInput {
-                                project_id: attribution.project_id,
-                                start_time: snap.timestamp.clone(),
-                                end_time: None,
-                                duration_secs: 0,
-                                jira_key: attribution.jira_key,
-                                branch: attribution.branch,
-                                window_title: tracking_window
-                                    .as_ref()
-                                    .map(|w| w.window_title.clone()),
-                                process_name: tracking_window
-                                    .as_ref()
-                                    .map(|w| w.process_name.clone()),
-                                is_idle: false,
-                                is_huddle: false,
-                                huddle_channel: None,
-                                is_manual: false,
+                            // Auto-merge: if enabled, try to resume the open
+                            // session left from the previous run instead of
+                            // creating a new fragmented one.
+                            let maybe_resumed = if settings.auto_merge_enabled {
+                                if let Some(pid) = attribution.project_id.as_deref() {
+                                    let db = state.db.lock().unwrap();
+                                    session_store::find_resumable_session(&db, pid)
+                                        .ok()
+                                        .flatten()
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
                             };
 
-                            let db = state.db.lock().unwrap();
-                            if let Ok(session) = session_store::create_session(&db, input) {
-                                current_session_id = Some(session.id);
-                                session_start_time = snap_time;
+                            if let Some(existing) = maybe_resumed {
+                                // Resume the pre-existing open session.  Duration
+                                // will accumulate from its original start_time so
+                                // the session spans the full wall-clock period.
+                                current_session_id = Some(existing.id);
+                                session_start_time =
+                                    chrono::DateTime::parse_from_rfc3339(&existing.start_time)
+                                        .ok()
+                                        .map(|t| t.with_timezone(&chrono::Utc));
+                            } else {
+                                let input = CreateSessionInput {
+                                    project_id: attribution.project_id,
+                                    start_time: snap.timestamp.clone(),
+                                    end_time: None,
+                                    duration_secs: 0,
+                                    jira_key: attribution.jira_key,
+                                    branch: attribution.branch,
+                                    window_title: tracking_window
+                                        .as_ref()
+                                        .map(|w| w.window_title.clone()),
+                                    process_name: tracking_window
+                                        .as_ref()
+                                        .map(|w| w.process_name.clone()),
+                                    is_idle: false,
+                                    is_huddle: false,
+                                    huddle_channel: None,
+                                    is_manual: false,
+                                };
+
+                                let db = state.db.lock().unwrap();
+                                if let Ok(session) = session_store::create_session(&db, input) {
+                                    current_session_id = Some(session.id);
+                                    session_start_time = snap_time;
+                                }
                             }
                         } else if let Some(ref id) = current_session_id {
                             // Heartbeat update: keep duration current but leave end_time = NULL
@@ -255,6 +282,7 @@ pub fn run() {
             commands::tracking::get_current_activity,
             commands::storage::get_storage_info,
             commands::storage::erase_sessions,
+            commands::update::check_for_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

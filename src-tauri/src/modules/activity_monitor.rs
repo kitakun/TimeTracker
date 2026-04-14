@@ -44,11 +44,23 @@ pub struct ActivityMonitor {
     state: Arc<Mutex<MonitorState>>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct MonitorState {
     tracking: TrackingState,
     last_snapshot: Option<ActivitySnapshot>,
     manually_paused: bool,
+    idle_detection_enabled: bool,
+}
+
+impl Default for MonitorState {
+    fn default() -> Self {
+        Self {
+            tracking: TrackingState::default(),
+            last_snapshot: None,
+            manually_paused: false,
+            idle_detection_enabled: true,
+        }
+    }
 }
 
 impl Default for TrackingState {
@@ -93,9 +105,9 @@ impl ActivityMonitor {
                 let just_woke_from_sleep =
                     real_elapsed_secs > config.poll_interval_secs.saturating_mul(3);
 
-                let manually_paused = {
+                let (manually_paused, idle_detection_enabled) = {
                     let s = state.lock().unwrap();
-                    s.manually_paused
+                    (s.manually_paused, s.idle_detection_enabled)
                 };
 
                 let idle_secs = if just_woke_from_sleep {
@@ -107,7 +119,7 @@ impl ActivityMonitor {
 
                 let tracking = if manually_paused {
                     TrackingState::Paused
-                } else if idle_secs >= config.idle_threshold_secs {
+                } else if idle_detection_enabled && idle_secs >= config.idle_threshold_secs {
                     TrackingState::Idle
                 } else {
                     TrackingState::Running
@@ -142,6 +154,10 @@ impl ActivityMonitor {
     pub fn resume(&self) {
         let mut s = self.state.lock().unwrap();
         s.manually_paused = false;
+    }
+
+    pub fn set_idle_detection_enabled(&self, enabled: bool) {
+        self.state.lock().unwrap().idle_detection_enabled = enabled;
     }
 
     pub fn is_paused(&self) -> bool {

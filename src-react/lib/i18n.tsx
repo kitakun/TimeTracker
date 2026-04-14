@@ -165,6 +165,28 @@ const translations = {
     "appSettings.loadingStorage": "Loading storage info\u2026",
     "appSettings.erased": "All sessions erased.",
 
+    // App Settings — System section
+    "appSettings.system": "System",
+
+    // App Settings — idle detection toggle
+    "appSettings.idleDetection": "Enable idle detection",
+    "appSettings.idleDetectionHint": "Automatically pause tracking after a period of inactivity",
+
+    // App Settings — auto-merge toggle
+    "appSettings.autoMerge": "Auto-merge processor",
+    "appSettings.autoMergeHint": "Resume the previous session after a short restart or wake-up (gap < 1 hour) instead of creating a new one",
+
+    // App Settings — update button
+    "appSettings.downloadUpdate": "New version available",
+
+    // Dashboard — delete session
+    "dashboard.deleteSession": "Delete session",
+
+    // Review — by-issue summary table
+    "review.byIssue": "By Issue",
+    "review.summaryPublished": "{done}/{total} published",
+    "review.summaryAllPublished": "All published",
+
     // Language toggle label (shown to switch TO that lang)
     "lang.switchTo": "RU",
   },
@@ -330,6 +352,28 @@ const translations = {
     "appSettings.eraseConfirm": "\u0423\u0434\u0430\u043b\u0438\u0442\u044c {count} \u0441\u0435\u0441\u0441\u0438\u0439? \u042d\u0442\u043e \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u043d\u0435\u043b\u044c\u0437\u044f \u043e\u0442\u043c\u0435\u043d\u0438\u0442\u044c.",
     "appSettings.loadingStorage": "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430\u2026",
     "appSettings.erased": "\u0412\u0441\u0435 \u0441\u0435\u0441\u0441\u0438\u0438 \u0443\u0434\u0430\u043b\u0435\u043d\u044b.",
+
+    // App Settings — System section
+    "appSettings.system": "\u0421\u0438\u0441\u0442\u0435\u043c\u0430",
+
+    // App Settings — idle detection toggle
+    "appSettings.idleDetection": "\u041e\u043f\u0440\u0435\u0434\u0435\u043b\u044f\u0442\u044c \u043f\u0440\u043e\u0441\u0442\u043e\u0439",
+    "appSettings.idleDetectionHint": "\u0410\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043d\u0430 \u043f\u0430\u0443\u0437\u0443 \u043f\u043e\u0441\u043b\u0435 \u043f\u0435\u0440\u0438\u043e\u0434\u0430 \u043d\u0435\u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438",
+
+    // App Settings — auto-merge toggle
+    "appSettings.autoMerge": "\u0410\u0432\u0442\u043e\u043e\u0431\u044a\u0435\u0434\u0438\u043d\u0435\u043d\u0438\u0435",
+    "appSettings.autoMergeHint": "\u0412\u043e\u0437\u043e\u0431\u043d\u043e\u0432\u043b\u044f\u0442\u044c \u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0443\u044e \u0441\u0435\u0441\u0441\u0438\u044e \u043f\u043e\u0441\u043b\u0435 \u043a\u043e\u0440\u043e\u0442\u043a\u043e\u0433\u043e \u043f\u0435\u0440\u0435\u0437\u0430\u043f\u0443\u0441\u043a\u0430 \u0438\u043b\u0438 \u043f\u0440\u043e\u0431\u0443\u0436\u0434\u0435\u043d\u0438\u044f (\u043c\u0435\u043d\u0435\u0435 1 \u0447\u0430\u0441\u0430)",
+
+    // App Settings — update button
+    "appSettings.downloadUpdate": "\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u043d\u043e\u0432\u0430\u044f \u0432\u0435\u0440\u0441\u0438\u044f",
+
+    // Dashboard — delete session
+    "dashboard.deleteSession": "\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0441\u0435\u0441\u0441\u0438\u044e",
+
+    // Review — by-issue summary table
+    "review.byIssue": "\u041f\u043e \u0437\u0430\u0434\u0430\u0447\u0430\u043c",
+    "review.summaryPublished": "{done}/{total} \u043e\u043f\u0443\u0431\u043b.",
+    "review.summaryAllPublished": "\u0412\u0441\u0435 \u043e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u044b",
 
     // Language toggle label
     "lang.switchTo": "EN",

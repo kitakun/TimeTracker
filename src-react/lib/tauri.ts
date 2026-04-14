@@ -77,6 +77,8 @@ export interface AppSettings {
   minimize_to_tray: boolean;
   track_slack_huddles: boolean;
   jira_enabled: boolean;
+  idle_detection_enabled: boolean;
+  auto_merge_enabled: boolean;
 }
 
 export interface StorageInfo {
@@ -142,6 +144,10 @@ export const saveSettings = (settings: AppSettings) =>
 
 export const getStorageInfo = () => invoke<StorageInfo>("get_storage_info");
 export const eraseSessions = () => invoke<void>("erase_sessions");
+
+// ── Update check ─────────────────────────────────────────────────────────────
+
+export const checkForUpdate = () => invoke<string | null>("check_for_update");
 
 // ── Tracking commands ─────────────────────────────────────────────────────────
 

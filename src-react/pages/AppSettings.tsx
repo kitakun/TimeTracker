@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
-import { getSettings, saveSettings, AppSettings, getStorageInfo, eraseSessions, StorageInfo } from "../lib/tauri";
+import { getSettings, saveSettings, AppSettings, getStorageInfo, eraseSessions, StorageInfo, checkForUpdate } from "../lib/tauri";
 import { useI18n } from "../lib/i18n";
 import { useToast } from "../lib/toast";
-import { Check, Plus, Trash2, RefreshCw, Database } from "lucide-react";
+import { Check, Plus, Trash2, RefreshCw, Database, Download } from "lucide-react";
+import { getVersion } from "@tauri-apps/api/app";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 function testPattern(pattern: string, input: string): string | null {
   if (!pattern || !input) return null;
@@ -23,10 +25,14 @@ export default function AppSettingsPage() {
   const [testInput, setTestInput] = useState("");
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [erasing, setErasing] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState<string | null>(null);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
 
   useEffect(() => {
     getSettings().then(setSettings);
     getStorageInfo().then(setStorageInfo);
+    getVersion().then(setCurrentVersion);
+    checkForUpdate().then((tag) => { if (tag) setLatestVersion(tag); });
   }, []);
 
   async function handleErase() {
@@ -58,7 +64,6 @@ export default function AppSettingsPage() {
     try {
       await saveSettings(settings);
       toast(t("appSettings.saved"), "success");
-      // Notify Layout (and any other listeners) that settings changed.
       window.dispatchEvent(new CustomEvent("tt:settings-changed"));
     } catch (e) {
       toast(String(e), "error");
@@ -92,11 +97,68 @@ export default function AppSettingsPage() {
           <h1 className="page-title">{t("appSettings.title")}</h1>
           <p className="page-subtitle">{t("appSettings.subtitle")}</p>
         </div>
+        {currentVersion && (
+          <div className="version-info">
+            <span className="version-tag">v{currentVersion}</span>
+            {latestVersion && (
+              <button
+                className="btn btn-primary btn-sm version-update-btn"
+                onClick={() => openUrl("https://github.com/kitakun/TimeTracker/releases")}
+              >
+                <Download size={12} /> {t("appSettings.downloadUpdate")}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* ── System ────────────────────────────────────────── */}
+      <div className="card mb-4">
+        <div className="card-title">{t("appSettings.system")}</div>
+        <div className="form-row">
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={settings.minimize_to_tray}
+              onChange={(e) => setSettings((s) => s ? ({ ...s, minimize_to_tray: e.target.checked }) : s)}
+            />
+            {t("appSettings.minimizeToTray")}
+          </label>
+        </div>
+        <div className="form-row">
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={settings.auto_merge_enabled}
+              onChange={(e) => setSettings((s) => s ? ({ ...s, auto_merge_enabled: e.target.checked }) : s)}
+            />
+            <span>
+              {t("appSettings.autoMerge")}
+              <span className="input-hint">{t("appSettings.autoMergeHint")}</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* ── Tracking ──────────────────────────────────────── */}
       <div className="card mb-4">
         <div className="card-title">{t("appSettings.tracking")}</div>
-        <div className="form-grid">
+
+        <div className="form-row">
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={settings.idle_detection_enabled}
+              onChange={(e) => setSettings((s) => s ? ({ ...s, idle_detection_enabled: e.target.checked }) : s)}
+            />
+            <span>
+              {t("appSettings.idleDetection")}
+              <span className="input-hint">{t("appSettings.idleDetectionHint")}</span>
+            </span>
+          </label>
+        </div>
+
+        <div className="form-grid" style={{ opacity: settings.idle_detection_enabled ? 1 : 0.4, pointerEvents: settings.idle_detection_enabled ? "auto" : "none" }}>
           <label className="form-label">
             {t("appSettings.idleThreshold")}
             <div className="input-hint">{t("appSettings.idleHint")}</div>
@@ -122,75 +184,6 @@ export default function AppSettingsPage() {
             />
           </label>
         </div>
-
-        <div className="form-row">
-          <label className="toggle-label">
-            <input
-              type="checkbox"
-              checked={settings.minimize_to_tray}
-              onChange={(e) => setSettings((s) => s ? ({ ...s, minimize_to_tray: e.target.checked }) : s)}
-            />
-            {t("appSettings.minimizeToTray")}
-          </label>
-        </div>
-      </div>
-
-      <div className="card mb-4">
-        <div className="card-title">{t("appSettings.jiraPatterns")}</div>
-        <p className="text-muted mb-3">{t("appSettings.patternsHint")}</p>
-
-        {/* Shared test input */}
-        <div className="pattern-test-row mb-3">
-          <label className="form-label" style={{ flex: 1 }}>
-            {t("appSettings.patternTestLabel")}
-            <input
-              className="form-input"
-              placeholder={t("appSettings.patternTestPlaceholder")}
-              value={testInput}
-              onChange={(e) => setTestInput(e.target.value)}
-            />
-          </label>
-        </div>
-
-        <div className="pattern-list">
-          {settings.jira_patterns.map((p, i) => {
-            const matchResult = testInput ? testPattern(p.pattern, testInput) : null;
-            const hasTest = testInput.length > 0;
-            return (
-              <div key={i} className="pattern-entry">
-                <div className="pattern-row">
-                  <input
-                    className="form-input"
-                    placeholder="([A-Z][A-Z0-9]+-\d+)"
-                    value={p.pattern}
-                    onChange={(e) => setSettings((s) => s ? ({
-                      ...s,
-                      jira_patterns: s.jira_patterns.map((pp, idx) => idx === i ? { ...pp, pattern: e.target.value } : pp)
-                    }) : s)}
-                  />
-                  <input
-                    className="form-input"
-                    placeholder={t("appSettings.patternDesc")}
-                    value={p.description}
-                    onChange={(e) => setSettings((s) => s ? ({
-                      ...s,
-                      jira_patterns: s.jira_patterns.map((pp, idx) => idx === i ? { ...pp, description: e.target.value } : pp)
-                    }) : s)}
-                  />
-                  <button className="btn-icon text-red" onClick={() => removePattern(i)}><Trash2 size={13} /></button>
-                </div>
-                {hasTest && p.pattern && (
-                  <div className={`pattern-result ${matchResult ? "pattern-result--match" : "pattern-result--no-match"}`}>
-                    {matchResult
-                      ? t("appSettings.patternMatches", { key: matchResult })
-                      : t("appSettings.patternNoMatch")}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <button className="btn btn-ghost mt-2" onClick={addPattern}><Plus size={13} /> {t("appSettings.addPattern")}</button>
       </div>
 
       {/* ── Integrations ──────────────────────────────────── */}
@@ -227,6 +220,66 @@ export default function AppSettingsPage() {
             </span>
           </label>
         </div>
+
+        {/* Jira Key Patterns — only visible when Jira is enabled */}
+        {settings.jira_enabled && (
+          <div className="mt-4">
+            <div className="card-subtitle">{t("appSettings.jiraPatterns")}</div>
+            <p className="text-muted mb-3">{t("appSettings.patternsHint")}</p>
+
+            <div className="pattern-test-row mb-3">
+              <label className="form-label" style={{ flex: 1 }}>
+                {t("appSettings.patternTestLabel")}
+                <input
+                  className="form-input"
+                  placeholder={t("appSettings.patternTestPlaceholder")}
+                  value={testInput}
+                  onChange={(e) => setTestInput(e.target.value)}
+                />
+              </label>
+            </div>
+
+            <div className="pattern-list">
+              {settings.jira_patterns.map((p, i) => {
+                const matchResult = testInput ? testPattern(p.pattern, testInput) : null;
+                const hasTest = testInput.length > 0;
+                return (
+                  <div key={i} className="pattern-entry">
+                    <div className="pattern-row">
+                      <input
+                        className="form-input"
+                        placeholder="([A-Z][A-Z0-9]+-\d+)"
+                        value={p.pattern}
+                        onChange={(e) => setSettings((s) => s ? ({
+                          ...s,
+                          jira_patterns: s.jira_patterns.map((pp, idx) => idx === i ? { ...pp, pattern: e.target.value } : pp)
+                        }) : s)}
+                      />
+                      <input
+                        className="form-input"
+                        placeholder={t("appSettings.patternDesc")}
+                        value={p.description}
+                        onChange={(e) => setSettings((s) => s ? ({
+                          ...s,
+                          jira_patterns: s.jira_patterns.map((pp, idx) => idx === i ? { ...pp, description: e.target.value } : pp)
+                        }) : s)}
+                      />
+                      <button className="btn-icon text-red" onClick={() => removePattern(i)}><Trash2 size={13} /></button>
+                    </div>
+                    {hasTest && p.pattern && (
+                      <div className={`pattern-result ${matchResult ? "pattern-result--match" : "pattern-result--no-match"}`}>
+                        {matchResult
+                          ? t("appSettings.patternMatches", { key: matchResult })
+                          : t("appSettings.patternNoMatch")}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <button className="btn btn-ghost mt-2" onClick={addPattern}><Plus size={13} /> {t("appSettings.addPattern")}</button>
+          </div>
+        )}
       </div>
 
       {/* ── Storage ───────────────────────────────────────── */}
