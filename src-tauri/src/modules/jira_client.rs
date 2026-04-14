@@ -193,6 +193,7 @@ mod tests {
             updated_at: "2024-01-15T09:00:00Z".into(),
             is_huddle: false,
             huddle_channel: None,
+            is_manual: false,
         }
     }
 

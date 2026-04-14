@@ -132,6 +132,20 @@ const translations = {
     "huddle.elapsed": "Call time",
     "huddle.badge": "Huddle",
 
+    // Manual tracking
+    "manual.placeholder": "What are you working on?",
+    "manual.add": "Track",
+    "manual.stop": "Stop",
+    "manual.rename": "Rename",
+    "manual.labelEmpty": "Label cannot be empty",
+
+    // Close confirmation
+    "close.title": "Active sessions",
+    "close.body": "You have active tracking sessions. What would you like to do?",
+    "close.minimize": "Minimize to tray",
+    "close.stopAndMinimize": "Stop tracking & minimize",
+    "close.cancel": "Cancel",
+
     // App Settings — Integrations section
     "appSettings.integrations": "Integrations",
     "appSettings.slackHuddle": "Track Slack Huddles",
@@ -276,6 +290,20 @@ const translations = {
     "appSettings.patternTestPlaceholder": "feature/PROJ-123-my-feature",
     "appSettings.patternMatches": "\u0421\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0435: {key}",
     "appSettings.patternNoMatch": "\u041d\u0435\u0442 \u0441\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0439",
+
+    // Manual tracking
+    "manual.placeholder": "\u041d\u0430\u0434 \u0447\u0435\u043c \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442\u0435?",
+    "manual.add": "\u041e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u0442\u044c",
+    "manual.stop": "\u0421\u0442\u043e\u043f",
+    "manual.rename": "\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c",
+    "manual.labelEmpty": "\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043d\u0435 \u043c\u043e\u0436\u0435\u0442 \u0431\u044b\u0442\u044c \u043f\u0443\u0441\u0442\u044b\u043c",
+
+    // Close confirmation
+    "close.title": "\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u0441\u0435\u0441\u0441\u0438\u0438",
+    "close.body": "\u0415\u0441\u0442\u044c \u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u0441\u0435\u0441\u0441\u0438\u0438 \u043e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u043d\u0438\u044f. \u0427\u0442\u043e \u0441\u0434\u0435\u043b\u0430\u0442\u044c?",
+    "close.minimize": "\u0421\u0432\u0435\u0440\u043d\u0443\u0442\u044c \u0432 \u0442\u0440\u0435\u0439",
+    "close.stopAndMinimize": "\u041e\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u044c \u0438 \u0441\u0432\u0435\u0440\u043d\u0443\u0442\u044c",
+    "close.cancel": "\u041e\u0442\u043c\u0435\u043d\u0430",
 
     // Huddle (Slack call)
     "huddle.live": "\u0417\u0432\u043e\u043d\u043e\u043a",

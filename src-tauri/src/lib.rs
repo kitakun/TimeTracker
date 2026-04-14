@@ -148,6 +148,7 @@ pub fn run() {
                                 is_idle: false,
                                 is_huddle: false,
                                 huddle_channel: None,
+                                is_manual: false,
                             };
 
                             let db = state.db.lock().unwrap();
@@ -201,13 +202,26 @@ pub fn run() {
                 init.monitor_config.poll_interval_secs,
             );
 
-            // Intercept the window close button: hide to tray instead of quitting.
+            // Intercept the window close button.
+            // – No active sessions → hide to tray as usual.
+            // – Active sessions    → emit "close-requested" so the UI can ask the user.
             let app_handle_close = app.handle().clone();
             if let Some(win) = app.get_webview_window("main") {
                 win.on_window_event(move |event| {
                     if let WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
-                        if let Some(w) = app_handle_close.get_webview_window("main") {
+                        let has_active = {
+                            let state = app_handle_close.state::<AppState>();
+                            let db = state.db.lock().unwrap();
+                            db.query_row(
+                                "SELECT COUNT(*) FROM sessions WHERE end_time IS NULL",
+                                [],
+                                |r| r.get::<_, i64>(0),
+                            ).unwrap_or(0) > 0
+                        };
+                        if has_active {
+                            let _ = app_handle_close.emit("close-requested", ());
+                        } else if let Some(w) = app_handle_close.get_webview_window("main") {
                             let _ = w.hide();
                         }
                     }
@@ -228,6 +242,7 @@ pub fn run() {
             commands::sessions::update_session,
             commands::sessions::delete_session,
             commands::sessions::list_sessions_for_range,
+            commands::sessions::start_manual_session,
             commands::jira::save_jira_connection,
             commands::jira::get_jira_connection,
             commands::jira::test_jira_connection,

@@ -44,6 +44,13 @@ fn run_migrations(conn: &Connection) -> Result<()> {
             params![3i64],
         )?;
     }
+    if version < 4 {
+        conn.execute_batch(MIGRATION_4)?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (?1, datetime('now'))",
+            params![4i64],
+        )?;
+    }
 
     Ok(())
 }
@@ -92,6 +99,11 @@ const MIGRATION_3: &str = "
 ALTER TABLE sessions ADD COLUMN is_huddle INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE sessions ADD COLUMN huddle_channel TEXT;
 CREATE INDEX IF NOT EXISTS idx_sessions_huddle ON sessions(is_huddle);
+";
+
+const MIGRATION_4: &str = "
+ALTER TABLE sessions ADD COLUMN is_manual INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_sessions_manual ON sessions(is_manual);
 ";
 
 const MIGRATION_2: &str = "

@@ -30,6 +30,7 @@ export interface Session {
   updated_at: string;
   is_huddle: boolean;
   huddle_channel: string | null;
+  is_manual: boolean;
 }
 
 export interface MergedSession {
@@ -44,6 +45,8 @@ export interface MergedSession {
   notes: string | null;
   is_huddle: boolean;
   huddle_channel: string | null;
+  is_manual: boolean;
+  window_title: string | null;
 }
 
 export interface HuddleStatus {
@@ -107,8 +110,10 @@ export const listUnpublishedForDay = (date: string) =>
   invoke<Session[]>("list_unpublished_for_day", { date });
 export const updateSession = (
   id: string,
-  input: { end_time?: string; duration_secs?: number; jira_key?: string; notes?: string; project_id?: string | null }
+  input: { end_time?: string; duration_secs?: number; jira_key?: string; notes?: string; project_id?: string | null; window_title?: string }
 ) => invoke<Session>("update_session", { id, input });
+export const startManualSession = (label: string) =>
+  invoke<Session>("start_manual_session", { label });
 export const deleteSession = (id: string) => invoke<void>("delete_session", { id });
 export const listSessionsForRange = (from: string, to: string) =>
   invoke<Session[]>("list_sessions_for_range", { from, to });

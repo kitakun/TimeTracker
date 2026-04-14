@@ -23,11 +23,13 @@ Tracks what you work on automatically — by watching the active window and open
 ## Features
 
 - **Automatic session tracking** — detects the focused window and active IDE project every few seconds.
+- **Manual tracking** — start a named timer for anything (code review, meetings, research) directly from the Today page.
 - **Background IDE detection** — keeps tracking even when VS Code / Rider / Cursor / WebStorm is not the focused window.
 - **Git & Jira attribution** — reads the current branch name and extracts the Jira issue key automatically.
 - **Slack Huddle tracking** — optionally records call duration when you are in a Slack Huddle.
 - **Sleep-safe** — detects system wake-up and does not mark sleeping time as idle.
 - **System tray** — minimizes to tray on close, single instance, click to restore.
+- **Close guard** — warns when closing with active sessions and offers to stop them cleanly.
 - **Review page** — inspect, edit, merge, and selectively publish sessions to Jira.
 - **EN / RU localization.**
 

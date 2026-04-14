@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import {
   Clock,
   FolderOpen,
@@ -15,7 +17,8 @@ import {
 } from "lucide-react";
 import { useTrackingState } from "../hooks/useTrackingState";
 import { useI18n, TranslationKey } from "../lib/i18n";
-import { getSettings } from "../lib/tauri";
+import { getSettings, updateSession, listSessionsForDay } from "../lib/tauri";
+import { todayDate } from "../lib/utils";
 
 const BASE_NAV: { to: string; labelKey: TranslationKey; icon: React.ElementType; requiresJira?: boolean }[] = [
   { to: "/", labelKey: "nav.today", icon: LayoutDashboard },
@@ -30,6 +33,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { t, locale, setLocale } = useI18n();
   const [collapsed, setCollapsed] = useState(false);
   const [jiraEnabled, setJiraEnabled] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
+
+  // Stop all open sessions and then hide the window
+  async function stopAndMinimize() {
+    const sessions = await listSessionsForDay(todayDate());
+    const open = sessions.filter((s) => !s.end_time);
+    const now = new Date().toISOString();
+    await Promise.all(open.map((s) => {
+      const dur = Math.max(0, Math.floor((Date.now() - new Date(s.start_time).getTime()) / 1000));
+      return updateSession(s.id, { end_time: now, duration_secs: dur });
+    }));
+    setShowCloseModal(false);
+    await getCurrentWindow().hide();
+  }
 
   function refreshSettings() {
     getSettings()
@@ -40,7 +57,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     refreshSettings();
     window.addEventListener("tt:settings-changed", refreshSettings);
-    return () => window.removeEventListener("tt:settings-changed", refreshSettings);
+    const unlistenClose = listen("close-requested", () => setShowCloseModal(true));
+    return () => {
+      window.removeEventListener("tt:settings-changed", refreshSettings);
+      unlistenClose.then((fn) => fn());
+    };
   }, []);
 
   const nav = BASE_NAV.filter((item) => !item.requiresJira || jiraEnabled);
@@ -114,6 +135,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="main-content">{children}</main>
+
+      {/* ── Close confirmation modal ─────────────────────────────────────── */}
+      {showCloseModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-title">{t("close.title")}</div>
+            <p className="modal-body">{t("close.body")}</p>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setShowCloseModal(false)}>
+                {t("close.cancel")}
+              </button>
+              <button className="btn btn-ghost" onClick={async () => {
+                setShowCloseModal(false);
+                await getCurrentWindow().hide();
+              }}>
+                {t("close.minimize")}
+              </button>
+              <button className="btn btn-primary" onClick={stopAndMinimize}>
+                {t("close.stopAndMinimize")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

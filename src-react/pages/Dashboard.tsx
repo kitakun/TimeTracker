@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import {
-  listMergedSessionsForDay, listProjects, updateSession,
-  MergedSession, Project, ActivitySnapshot, HuddleStatus,
+  listMergedSessionsForDay, listSessionsForDay, listProjects, updateSession, startManualSession,
+  MergedSession, Project, ActivitySnapshot, HuddleStatus, Session,
 } from "../lib/tauri";
 import { formatDurationHuman, formatTime, todayDate, totalDurationSecs } from "../lib/utils";
 import { useI18n } from "../lib/i18n";
 import { useTrackingState } from "../hooks/useTrackingState";
-import { RefreshCw, Clock, Tag, GitBranch, Pause, Play, Phone, Edit2, Check, X, Loader2 } from "lucide-react";
+import { useToast } from "../lib/toast";
+import { RefreshCw, Clock, Tag, GitBranch, Pause, Play, Phone, Edit2, Check, X, Loader2, Square, Timer } from "lucide-react";
 
 function formatElapsed(secs: number): string {
   const h = Math.floor(secs / 3600);
@@ -19,6 +20,7 @@ function formatElapsed(secs: number): string {
 
 export default function Dashboard() {
   const { t, locale } = useI18n();
+  const { toast } = useToast();
   const { state: trackingState, pause, resume } = useTrackingState();
   const [sessions, setSessions] = useState<MergedSession[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -30,11 +32,24 @@ export default function Dashboard() {
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const today = todayDate();
 
+  // ── Manual tracking ───────────────────────────────────────────────────────
+  const [manualLabel, setManualLabel] = useState("");
+  const [manualSessions, setManualSessions] = useState<Session[]>([]);
+  const [manualElapsed, setManualElapsed] = useState<Record<string, number>>({});
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameBuf, setRenameBuf] = useState("");
+
   const reload = useCallback(async () => {
     try {
-      const [s, p] = await Promise.all([listMergedSessionsForDay(today), listProjects()]);
-      setSessions(s);
+      const [merged, raw, p] = await Promise.all([
+        listMergedSessionsForDay(today),
+        listSessionsForDay(today),
+        listProjects(),
+      ]);
+      setSessions(merged);
       setProjects(p);
+      // Restore any open manual sessions — survives page navigation
+      setManualSessions(raw.filter((s) => s.is_manual && !s.end_time));
     } finally {
       setLoading(false);
     }
@@ -113,6 +128,46 @@ export default function Dashboard() {
     setEditingIdx(null);
     setNoteBuf("");
   }
+
+  // ── Manual session handlers ───────────────────────────────────────────────
+  async function handleAddManual() {
+    const label = manualLabel.trim();
+    if (!label) { toast(t("manual.labelEmpty"), "error"); return; }
+    const session = await startManualSession(label);
+    setManualSessions((prev) => [...prev, session]);
+    setManualLabel("");
+  }
+
+  async function handleStopManual(s: Session) {
+    const elapsed = Math.max(0, Math.floor((Date.now() - new Date(s.start_time).getTime()) / 1000));
+    const now = new Date().toISOString();
+    await updateSession(s.id, { end_time: now, duration_secs: elapsed });
+    setManualSessions((prev) => prev.filter((m) => m.id !== s.id));
+    setManualElapsed((prev) => { const next = { ...prev }; delete next[s.id]; return next; });
+    await reload();
+  }
+
+  async function handleRenameManual(s: Session) {
+    const label = renameBuf.trim();
+    if (!label) return;
+    await updateSession(s.id, { window_title: label });
+    setManualSessions((prev) => prev.map((m) => m.id === s.id ? { ...m, window_title: label } : m));
+    setRenamingId(null);
+  }
+
+  // Tick manual session elapsed counters every second
+  useEffect(() => {
+    if (manualSessions.length === 0) return;
+    const id = setInterval(() => {
+      const now = Date.now();
+      setManualElapsed(
+        Object.fromEntries(
+          manualSessions.map((s) => [s.id, Math.max(0, Math.floor((now - new Date(s.start_time).getTime()) / 1000))])
+        )
+      );
+    }, 1000);
+    return () => clearInterval(id);
+  }, [manualSessions]);
 
   // ── Live project context (what we're tracking right now) ──────────────────
   const liveProject = liveSession ? projectById(liveSession.project_id) : null;
@@ -198,6 +253,61 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ── Manual task input ─────────────────────────────────────────────── */}
+      <div className="manual-track-row">
+        <Timer size={14} className="manual-track-icon" />
+        <input
+          className="form-input manual-track-input"
+          placeholder={t("manual.placeholder")}
+          value={manualLabel}
+          onChange={(e) => setManualLabel(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleAddManual(); }}
+        />
+        <button className="btn btn-primary btn-sm" onClick={handleAddManual}>
+          {t("manual.add")}
+        </button>
+      </div>
+
+      {/* ── Active manual session cards ───────────────────────────────────── */}
+      {manualSessions.map((s) => (
+        <div key={s.id} className="manual-session-card">
+          <div className="manual-session-left">
+            <span className="live-pulse" />
+            {renamingId === s.id ? (
+              <div className="manual-rename-row">
+                <input
+                  className="form-input manual-rename-input"
+                  value={renameBuf}
+                  autoFocus
+                  onChange={(e) => setRenameBuf(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleRenameManual(s);
+                    if (e.key === "Escape") setRenamingId(null);
+                  }}
+                />
+                <button className="btn-icon text-green" onClick={() => handleRenameManual(s)}><Check size={13} /></button>
+                <button className="btn-icon text-muted" onClick={() => setRenamingId(null)}><X size={13} /></button>
+              </div>
+            ) : (
+              <span
+                className="manual-session-label"
+                title={t("manual.rename")}
+                onClick={() => { setRenamingId(s.id); setRenameBuf(s.window_title ?? ""); }}
+              >
+                {s.window_title ?? "–"}
+                <Edit2 size={11} className="manual-rename-icon" />
+              </span>
+            )}
+          </div>
+          <div className="manual-session-right">
+            <span className="manual-elapsed">{formatElapsed(manualElapsed[s.id] ?? 0)}</span>
+            <button className="btn btn-ghost btn-sm" onClick={() => handleStopManual(s)}>
+              <Square size={11} /> {t("manual.stop")}
+            </button>
+          </div>
+        </div>
+      ))}
+
       <div className="card-row">
         <div className="stat-card">
           <div className="stat-label">{t("dashboard.totalTracked")}</div>
@@ -264,6 +374,11 @@ export default function Dashboard() {
                     {formatTime(s.start_time)}–{s.end_time ? formatTime(s.end_time) : "…"}
                   </div>
                   <div className="session-meta">
+                    {s.is_manual && (
+                      <span className="manual-badge">
+                        <Timer size={10} /> {s.window_title ?? "–"}
+                      </span>
+                    )}
                     {s.is_huddle && (
                       <span className="huddle-badge">
                         <Phone size={10} /> {s.huddle_channel ? `#${s.huddle_channel}` : t("huddle.badge")}
@@ -317,9 +432,25 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  <div className="session-dur">{formatDurationHuman(s.duration_secs)}</div>
+                  <div className="session-dur">
+                    {s.is_manual && !s.end_time
+                      ? formatElapsed(manualElapsed[s.session_ids[0]] ?? 0)
+                      : formatDurationHuman(s.duration_secs)
+                    }
+                  </div>
+                  {s.is_manual && !s.end_time && (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        const ms = manualSessions.find((m) => m.id === s.session_ids[0]);
+                        if (ms) handleStopManual(ms);
+                      }}
+                    >
+                      <Square size={11} /> {t("manual.stop")}
+                    </button>
+                  )}
                   {s.is_published && <span className="published-badge">{t("dashboard.published")}</span>}
-                  {isLive && <span className="live-badge">● live</span>}
+                  {isLive && !s.is_manual && <span className="live-badge">● live</span>}
                 </div>
               );
             })}

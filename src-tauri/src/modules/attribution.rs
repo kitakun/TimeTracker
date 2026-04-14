@@ -161,6 +161,8 @@ pub struct MergedSession {
     pub notes: Option<String>,
     pub is_huddle: bool,
     pub huddle_channel: Option<String>,
+    pub is_manual: bool,
+    pub window_title: Option<String>,
 }
 
 impl From<&crate::modules::session_store::Session> for MergedSession {
@@ -177,6 +179,8 @@ impl From<&crate::modules::session_store::Session> for MergedSession {
             notes: s.notes.clone(),
             is_huddle: s.is_huddle,
             huddle_channel: s.huddle_channel.clone(),
+            is_manual: s.is_manual,
+            window_title: s.window_title.clone(),
         }
     }
 }
@@ -206,6 +210,7 @@ mod tests {
             updated_at: start.into(),
             is_huddle: false,
             huddle_channel: None,
+            is_manual: false,
         }
     }
 

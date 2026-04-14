@@ -99,6 +99,7 @@ pub fn start(app_handle: AppHandle, poll_secs: u64) {
                         is_idle: false,
                         is_huddle: true,
                         huddle_channel: info.channel.clone(),
+                        is_manual: false,
                     };
                     let db = state.db.lock().unwrap();
                     if let Ok(session) = session_store::create_session(&db, input) {
