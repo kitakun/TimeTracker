@@ -19,7 +19,15 @@ const translations = {
     // Actions
     "action.pauseTracking": "Pause tracking",
     "action.resumeTracking": "Resume tracking",
-    "action.refresh": "Refresh",
+    "action.pauseSession": "Pause",
+    "action.pauseSessionTitle": "Pause this session (time is not recorded while paused)",
+    "action.resumeSession": "Resume",
+    "action.resumeSessionTitle": "Resume this session",
+    "action.stopSession": "Stop",
+    "action.stopSessionTitle": "Finish this session (stays visible so you can restart it)",
+    "action.startNewSession": "Start new session",
+    "action.refresh": "Reload",
+    "action.refreshTitle": "Reload sessions from the database (auto-refreshes every 10 s)",
     "action.save": "Save",
     "action.cancel": "Cancel",
 
@@ -59,8 +67,13 @@ const translations = {
     "review.colProject": "Project",
     "review.colNotes": "Notes",
     "review.colStatus": "Status",
+    "review.colLogged": "Logged",
     "review.statusPublished": "\u2713 Published",
     "review.statusPending": "Pending",
+    "review.loggedTitle": "Mark as logged (time has been recorded elsewhere)",
+    "review.unloggedTitle": "Mark as not logged",
+    "review.summaryLogged": "Logged",
+    "review.summaryPartialLogged": "{done}/{total} logged",
     "review.noJiraKey": "No Jira key \u2013 edit the session first.",
     "review.publishedSuccess": "Published {duration} to {key}",
     "review.deleteConfirm": "Delete this session?",
@@ -176,6 +189,10 @@ const translations = {
     "appSettings.autoMerge": "Auto-merge processor",
     "appSettings.autoMergeHint": "Resume the previous session after a short restart or wake-up (gap < 1 hour) instead of creating a new one",
 
+    // App Settings — error reporting
+    "appSettings.showErrors": "Show unexpected errors",
+    "appSettings.showErrorsHint": "Display a notification when an unhandled error occurs in the UI",
+
     // App Settings — update button
     "appSettings.downloadUpdate": "New version available",
 
@@ -207,7 +224,15 @@ const translations = {
     // Actions
     "action.pauseTracking": "\u041f\u0430\u0443\u0437\u0430",
     "action.resumeTracking": "\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c",
+    "action.pauseSession": "\u041f\u0430\u0443\u0437\u0430",
+    "action.pauseSessionTitle": "\u041f\u043e\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043d\u0430 \u043f\u0430\u0443\u0437\u0443 (\u0432\u0440\u0435\u043c\u044f \u043d\u0435 \u0437\u0430\u043f\u0438\u0441\u044b\u0432\u0430\u0435\u0442\u0441\u044f)",
+    "action.resumeSession": "\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c",
+    "action.resumeSessionTitle": "\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c \u0441\u0435\u0441\u0441\u0438\u044e",
+    "action.stopSession": "\u041e\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u044c",
+    "action.stopSessionTitle": "\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044c \u0441\u0435\u0441\u0441\u0438\u044e (\u043c\u043e\u0436\u043d\u043e \u043d\u0430\u0447\u0430\u0442\u044c \u0437\u0430\u043d\u043e\u0432\u043e)",
+    "action.startNewSession": "\u041d\u0430\u0447\u0430\u0442\u044c \u043d\u043e\u0432\u0443\u044e \u0441\u0435\u0441\u0441\u0438\u044e",
     "action.refresh": "\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c",
+    "action.refreshTitle": "\u041f\u0435\u0440\u0435\u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0441\u0435\u0441\u0441\u0438\u0438 (\u0430\u0432\u0442\u043e-\u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u043a\u0430\u0436\u0434\u044b\u0435 10 \u0441)",
     "action.save": "\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c",
     "action.cancel": "\u041e\u0442\u043c\u0435\u043d\u0430",
 
@@ -247,8 +272,13 @@ const translations = {
     "review.colProject": "\u041f\u0440\u043e\u0435\u043a\u0442",
     "review.colNotes": "\u0417\u0430\u043c\u0435\u0442\u043a\u0438",
     "review.colStatus": "\u0421\u0442\u0430\u0442\u0443\u0441",
+    "review.colLogged": "\u0417\u0430\u043b\u043e\u0433\u0438\u0440\u043e\u0432\u0430\u043d\u043e",
     "review.statusPublished": "\u2713 \u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u043e",
     "review.statusPending": "\u041e\u0436\u0438\u0434\u0430\u0435\u0442",
+    "review.loggedTitle": "\u041e\u0442\u043c\u0435\u0442\u0438\u0442\u044c \u043a\u0430\u043a \u0437\u0430\u043b\u043e\u0433\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u043e\u0435",
+    "review.unloggedTitle": "\u0421\u043d\u044f\u0442\u044c \u043e\u0442\u043c\u0435\u0442\u043a\u0443",
+    "review.summaryLogged": "\u0417\u0430\u043b\u043e\u0433\u0438\u0440\u043e\u0432\u0430\u043d\u043e",
+    "review.summaryPartialLogged": "{done}/{total} \u0437\u0430\u043b\u043e\u0433\u0438\u0440\u043e\u0432\u0430\u043d\u043e",
     "review.noJiraKey": "\u041d\u0435\u0442 \u043a\u043b\u044e\u0447\u0430 Jira \u2014 \u0441\u043d\u0430\u0447\u0430\u043b\u0430 \u043e\u0442\u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u0443\u0439\u0442\u0435 \u0441\u0435\u0441\u0441\u0438\u044e.",
     "review.publishedSuccess": "\u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u043e {duration} \u0432 {key}",
     "review.deleteConfirm": "\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u044d\u0442\u0443 \u0441\u0435\u0441\u0441\u0438\u044e?",
@@ -363,6 +393,10 @@ const translations = {
     // App Settings — auto-merge toggle
     "appSettings.autoMerge": "\u0410\u0432\u0442\u043e\u043e\u0431\u044a\u0435\u0434\u0438\u043d\u0435\u043d\u0438\u0435",
     "appSettings.autoMergeHint": "\u0412\u043e\u0437\u043e\u0431\u043d\u043e\u0432\u043b\u044f\u0442\u044c \u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0443\u044e \u0441\u0435\u0441\u0441\u0438\u044e \u043f\u043e\u0441\u043b\u0435 \u043a\u043e\u0440\u043e\u0442\u043a\u043e\u0433\u043e \u043f\u0435\u0440\u0435\u0437\u0430\u043f\u0443\u0441\u043a\u0430 \u0438\u043b\u0438 \u043f\u0440\u043e\u0431\u0443\u0436\u0434\u0435\u043d\u0438\u044f (\u043c\u0435\u043d\u0435\u0435 1 \u0447\u0430\u0441\u0430)",
+
+    // App Settings — error reporting
+    "appSettings.showErrors": "\u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c \u043e\u0448\u0438\u0431\u043a\u0438",
+    "appSettings.showErrorsHint": "\u041e\u0442\u043e\u0431\u0440\u0430\u0436\u0430\u0442\u044c \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u0435 \u043f\u0440\u0438 \u043d\u0435\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u0430\u043d\u043d\u044b\u0445 \u043e\u0448\u0438\u0431\u043a\u0430\u0445",
 
     // App Settings — update button
     "appSettings.downloadUpdate": "\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u043d\u043e\u0432\u0430\u044f \u0432\u0435\u0440\u0441\u0438\u044f",

@@ -105,6 +105,25 @@ pub fn update_session(conn: &Connection, id: &str, input: UpdateSessionInput) ->
     get_session(conn, id)?.ok_or_else(|| anyhow::anyhow!("Session not found"))
 }
 
+/// Mark a session as manually logged (or unmark it).
+/// When `logged` is true, sets `is_published=1` and stamps `published_at`.
+/// When false, clears the published flag and removes the worklog reference.
+pub fn set_session_logged(conn: &Connection, id: &str, logged: bool) -> Result<Session> {
+    let now = Utc::now().to_rfc3339();
+    if logged {
+        conn.execute(
+            "UPDATE sessions SET is_published=1, published_at=?1, updated_at=?1 WHERE id=?2",
+            params![now, id],
+        )?;
+    } else {
+        conn.execute(
+            "UPDATE sessions SET is_published=0, published_at=NULL, worklog_id=NULL, updated_at=?1 WHERE id=?2",
+            params![now, id],
+        )?;
+    }
+    get_session(conn, id)?.ok_or_else(|| anyhow::anyhow!("Session not found"))
+}
+
 pub fn get_session(conn: &Connection, id: &str) -> Result<Option<Session>> {
     let sql = format!("SELECT {COLS} FROM sessions WHERE id=?1");
     let mut stmt = conn.prepare(&sql)?;

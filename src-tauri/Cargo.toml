@@ -1,6 +1,6 @@
 [package]
 name = "timetracker"
-version = "0.3.0-alpha"
+version = "0.4.0-alpha"
 description = "Privacy-first desktop time tracker with optional Jira integration"
 authors = ["kitakun"]
 repository = "https://github.com/kitakun/TimeTracker"

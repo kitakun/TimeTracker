@@ -57,7 +57,9 @@ impl Default for MonitorState {
         Self {
             tracking: TrackingState::default(),
             last_snapshot: None,
-            manually_paused: false,
+            // Start paused so no sessions are created during the loading/splashscreen
+            // phase.  `close_splashscreen` calls `resume()` once the UI is ready.
+            manually_paused: true,
             idle_detection_enabled: true,
         }
     }

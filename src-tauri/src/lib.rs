@@ -23,6 +23,23 @@ pub struct AppState {
     pub db: Mutex<rusqlite::Connection>,
     pub monitor: Mutex<ActivityMonitor>,
     pub data_dir: std::path::PathBuf,
+    /// Project+branch keys manually stopped by the user via the live-session
+    /// pause button.  The tracking loop skips creating new sessions for these
+    /// keys for 5 minutes so the session doesn't immediately reopen.
+    /// Format: "{project_id}::{branch_or_empty}" → Instant when snoozed.
+    pub snoozed_keys: Mutex<std::collections::HashMap<String, std::time::Instant>>,
+}
+
+/// Stable identifier for a (project, branch) pair used as the key in the
+/// active-sessions map and the snoozed-keys set.
+pub fn session_key(project_id: &str, branch: Option<&str>) -> String {
+    format!("{}::{}", project_id, branch.unwrap_or(""))
+}
+
+/// Minimal bookkeeping for one currently-open tracked session.
+struct ActiveSession {
+    id: String,
+    start_time: chrono::DateTime<chrono::Utc>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -62,14 +79,20 @@ pub fn run() {
             // ── Background session recording loop ────────────────────────────
             // Use tauri::async_runtime::spawn — not tokio::spawn — so we are
             // guaranteed to be inside Tauri's managed tokio runtime.
+            //
+            // The loop tracks *multiple* simultaneous sessions — one per
+            // (project_id, branch) pair that currently has an open IDE window.
+            // This fixes two bugs from v3:
+            //   • Branch change: the old key disappears → session finalised,
+            //     new key appears → fresh session created automatically.
+            //   • Two IDEs open: both keys are tracked independently.
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let mut rx = broadcast_tx.subscribe();
-                let mut current_session_id: Option<String> = None;
-                // Tracks the wall-clock moment the current session started so we
-                // can always compute total duration = now - session_start, not just
-                // one poll interval.
-                let mut session_start_time: Option<chrono::DateTime<chrono::Utc>> = None;
+
+                // key = session_key(project_id, branch)  →  open session bookkeeping
+                let mut active: std::collections::HashMap<String, ActiveSession> =
+                    std::collections::HashMap::new();
 
                 loop {
                     let snap = match rx.recv().await {
@@ -83,64 +106,137 @@ pub fn run() {
 
                     let snap_time = chrono::DateTime::parse_from_rfc3339(&snap.timestamp)
                         .ok()
-                        .map(|t| t.with_timezone(&chrono::Utc));
+                        .map(|t| t.with_timezone(&chrono::Utc))
+                        .unwrap_or_else(chrono::Utc::now);
 
                     if is_active {
-                        if current_session_id.is_none() {
-                            // ── Resolve attribution ───────────────────────────
-                            // Load projects/settings once for both foreground and
-                            // background IDE attribution attempts.
+                        // ── Load projects + settings ──────────────────────────
+                        let (projects, settings) = {
                             let db = state.db.lock().unwrap();
-                            let projects =
-                                project_registry::list_projects(&db).unwrap_or_default();
-                            let settings =
-                                settings_manager::load(&db).unwrap_or_default();
-                            drop(db);
+                            let p = project_registry::list_projects(&db).unwrap_or_default();
+                            let s = settings_manager::load(&db).unwrap_or_default();
+                            (p, s)
+                        };
+                        let engine = AttributionEngine::new(settings.jira_patterns.clone());
 
-                            let engine =
-                                AttributionEngine::new(settings.jira_patterns);
+                        // ── Collect all current (project, branch) attributions ─
+                        // We build a map keyed by session_key so that the
+                        // foreground window takes priority but all background IDEs
+                        // also get entries.
+                        let mut current: std::collections::HashMap<
+                            String,
+                            (modules::attribution::Attribution,
+                             Option<platform::types::ActiveWindowInfo>)
+                        > = std::collections::HashMap::new();
 
-                            // 1. Try the foreground window first.
-                            let fg_window = snap.window.clone();
-                            let fg_attr = fg_window
-                                .as_ref()
-                                .map(|w| engine.attribute(w, &projects));
+                        // Foreground window
+                        if let Some(w) = &snap.window {
+                            let attr = engine.attribute(w, &projects);
+                            if let Some(pid) = &attr.project_id {
+                                let key = session_key(pid, attr.branch.as_deref());
+                                current.insert(key, (attr, Some(w.clone())));
+                            }
+                        }
 
-                            // 2. If the foreground gave no registered-project match,
-                            //    scan background IDE windows (VS Code, Rider, etc.).
-                            //    This tracks work even when the IDE is not focused.
-                            let (attribution, tracking_window) =
-                                if fg_attr.as_ref().map_or(false, |a| a.project_id.is_some()) {
-                                    (fg_attr.unwrap(), fg_window)
+                        // All background IDE windows (VS Code, Rider, etc.)
+                        for ide_w in platform::list_ide_windows() {
+                            let attr = engine.attribute(&ide_w, &projects);
+                            if let Some(pid) = &attr.project_id {
+                                let key = session_key(pid, attr.branch.as_deref());
+                                // Don't overwrite a foreground entry
+                                current.entry(key).or_insert((attr, Some(ide_w)));
+                            }
+                        }
+
+                        // ── Expire snoozed keys and filter them out ───────────
+                        {
+                            let mut snoozed = state.snoozed_keys.lock().unwrap();
+                            snoozed.retain(|_, inst| {
+                                inst.elapsed() < std::time::Duration::from_secs(300)
+                            });
+                            current.retain(|k, _| !snoozed.contains_key(k));
+                        }
+
+                        // ── Finalise sessions for keys that disappeared ────────
+                        let disappeared: Vec<String> = active
+                            .keys()
+                            .filter(|k| !current.contains_key(*k))
+                            .cloned()
+                            .collect();
+
+                        for key in disappeared {
+                            if let Some(session) = active.remove(&key) {
+                                let dur =
+                                    (snap_time - session.start_time).num_seconds().max(0);
+                                let db = state.db.lock().unwrap();
+                                if dur >= MIN_SESSION_SECS {
+                                    let update = session_store::UpdateSessionInput {
+                                        end_time: Some(snap.timestamp.clone()),
+                                        duration_secs: Some(dur),
+                                        ..Default::default()
+                                    };
+                                    let _ = session_store::update_session(
+                                        &db, &session.id, update,
+                                    );
                                 } else {
-                                    let bg = platform::list_ide_windows()
-                                        .into_iter()
-                                        .find_map(|ide_w| {
-                                            let a = engine.attribute(&ide_w, &projects);
-                                            if a.project_id.is_some() {
-                                                Some((a, ide_w))
-                                            } else {
-                                                None
-                                            }
-                                        });
-                                    if let Some((bg_attr, bg_w)) = bg {
-                                        (bg_attr, Some(bg_w))
-                                    } else {
-                                        // No project match at all — skip this poll.
-                                        // We only record sessions for registered projects.
-                                        continue;
-                                    }
-                                };
+                                    let _ = session_store::delete_session(&db, &session.id);
+                                }
+                            }
+                        }
 
-                            // Auto-merge: if enabled, try to resume the open
-                            // session left from the previous run instead of
-                            // creating a new fragmented one.
+                        // ── Heartbeat existing sessions ───────────────────────
+                        // Also detect sessions that were closed externally (user
+                        // deleted from UI) so we don't keep a stale active entry.
+                        let mut externally_closed: Vec<String> = Vec::new();
+                        for (key, session) in &active {
+                            if !current.contains_key(key) {
+                                continue; // will be handled as disappeared above
+                            }
+                            let dur = (snap_time - session.start_time).num_seconds().max(0);
+                            let db = state.db.lock().unwrap();
+                            let still_open: i64 = db
+                                .query_row(
+                                    "SELECT COUNT(*) FROM sessions \
+                                     WHERE id=?1 AND end_time IS NULL",
+                                    rusqlite::params![&session.id],
+                                    |r| r.get(0),
+                                )
+                                .unwrap_or(0);
+                            if still_open > 0 {
+                                let update = session_store::UpdateSessionInput {
+                                    duration_secs: Some(dur),
+                                    ..Default::default()
+                                };
+                                let _ = session_store::update_session(
+                                    &db, &session.id, update,
+                                );
+                            } else {
+                                externally_closed.push(key.clone());
+                            }
+                        }
+                        for key in externally_closed {
+                            active.remove(&key);
+                        }
+
+                        // ── Create sessions for new keys ──────────────────────
+                        for (key, (attr, tracking_window)) in &current {
+                            if active.contains_key(key) {
+                                continue; // already tracking
+                            }
+
+                            // Auto-merge: try to resume a leftover open session
+                            // from the previous run (same project + same branch).
                             let maybe_resumed = if settings.auto_merge_enabled {
-                                if let Some(pid) = attribution.project_id.as_deref() {
+                                if let Some(pid) = attr.project_id.as_deref() {
                                     let db = state.db.lock().unwrap();
                                     session_store::find_resumable_session(&db, pid)
                                         .ok()
                                         .flatten()
+                                        // Branch must match so we don't resume a
+                                        // session from a different feature branch.
+                                        .filter(|s| {
+                                            s.branch.as_deref() == attr.branch.as_deref()
+                                        })
                                 } else {
                                     None
                                 }
@@ -149,22 +245,23 @@ pub fn run() {
                             };
 
                             if let Some(existing) = maybe_resumed {
-                                // Resume the pre-existing open session.  Duration
-                                // will accumulate from its original start_time so
-                                // the session spans the full wall-clock period.
-                                current_session_id = Some(existing.id);
-                                session_start_time =
+                                let start =
                                     chrono::DateTime::parse_from_rfc3339(&existing.start_time)
                                         .ok()
-                                        .map(|t| t.with_timezone(&chrono::Utc));
+                                        .map(|t| t.with_timezone(&chrono::Utc))
+                                        .unwrap_or(snap_time);
+                                active.insert(
+                                    key.clone(),
+                                    ActiveSession { id: existing.id, start_time: start },
+                                );
                             } else {
                                 let input = CreateSessionInput {
-                                    project_id: attribution.project_id,
+                                    project_id: attr.project_id.clone(),
                                     start_time: snap.timestamp.clone(),
                                     end_time: None,
                                     duration_secs: 0,
-                                    jira_key: attribution.jira_key,
-                                    branch: attribution.branch,
+                                    jira_key: attr.jira_key.clone(),
+                                    branch: attr.branch.clone(),
                                     window_title: tracking_window
                                         .as_ref()
                                         .map(|w| w.window_title.clone()),
@@ -176,50 +273,40 @@ pub fn run() {
                                     huddle_channel: None,
                                     is_manual: false,
                                 };
-
                                 let db = state.db.lock().unwrap();
                                 if let Ok(session) = session_store::create_session(&db, input) {
-                                    current_session_id = Some(session.id);
-                                    session_start_time = snap_time;
+                                    active.insert(
+                                        key.clone(),
+                                        ActiveSession {
+                                            id: session.id,
+                                            start_time: snap_time,
+                                        },
+                                    );
                                 }
                             }
-                        } else if let Some(ref id) = current_session_id {
-                            // Heartbeat update: keep duration current but leave end_time = NULL
-                            // so the frontend can identify the still-open session.
-                            // end_time is written only when the session is finalised below.
-                            if let (Some(start), Some(end)) = (session_start_time, snap_time) {
-                                let dur = (end - start).num_seconds().max(0);
+                        }
+                    } else {
+                        // Not active (paused/idle): finalise *all* open sessions.
+                        let to_finalize: Vec<(String, ActiveSession)> =
+                            active.drain().collect();
+                        for (_, session) in to_finalize {
+                            let dur =
+                                (snap_time - session.start_time).num_seconds().max(0);
+                            let db = state.db.lock().unwrap();
+                            if dur >= MIN_SESSION_SECS {
                                 let update = session_store::UpdateSessionInput {
-                                    end_time: None,
+                                    end_time: Some(snap.timestamp.clone()),
                                     duration_secs: Some(dur),
                                     ..Default::default()
                                 };
-                                let db = state.db.lock().unwrap();
-                                let _ = session_store::update_session(&db, id, update);
+                                let _ = session_store::update_session(
+                                    &db, &session.id, update,
+                                );
+                            } else {
+                                let _ = session_store::delete_session(&db, &session.id);
                             }
                         }
-                    } else if let Some(id) = current_session_id.take() {
-                        // Finalise: compute total elapsed and either save or discard
-                        let dur = match (session_start_time.take(), snap_time) {
-                            (Some(start), Some(end)) => (end - start).num_seconds().max(0),
-                            _ => 0,
-                        };
-
-                        let db = state.db.lock().unwrap();
-                        if dur >= MIN_SESSION_SECS {
-                            let update = session_store::UpdateSessionInput {
-                                end_time: Some(snap.timestamp.clone()),
-                                duration_secs: Some(dur),
-                                ..Default::default()
-                            };
-                            let _ = session_store::update_session(&db, &id, update);
-                        } else {
-                            // Too short to be meaningful — remove the stub row
-                            let _ = session_store::delete_session(&db, &id);
-                        }
                     }
-
-                    let _ = snap; // snap consumed; last_snapshot no longer needed
                 }
             });
 
@@ -270,6 +357,7 @@ pub fn run() {
             commands::sessions::delete_session,
             commands::sessions::list_sessions_for_range,
             commands::sessions::start_manual_session,
+            commands::sessions::set_session_logged,
             commands::jira::save_jira_connection,
             commands::jira::get_jira_connection,
             commands::jira::test_jira_connection,
@@ -278,11 +366,14 @@ pub fn run() {
             commands::settings::save_settings,
             commands::tracking::pause_tracking,
             commands::tracking::resume_tracking,
+            commands::tracking::stop_live_session,
+            commands::tracking::resume_tracked_project,
             commands::tracking::get_tracking_state,
             commands::tracking::get_current_activity,
             commands::storage::get_storage_info,
             commands::storage::erase_sessions,
             commands::update::check_for_update,
+            commands::splashscreen::close_splashscreen,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

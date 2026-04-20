@@ -29,6 +29,9 @@ pub struct AppSettings {
     /// restart or wake-from-sleep (gap < 1 hour) instead of creating a new one.
     #[serde(default)]
     pub auto_merge_enabled: bool,
+    /// When true, unhandled JavaScript errors are shown as toast notifications.
+    #[serde(default)]
+    pub show_unexpected_errors: bool,
 }
 
 impl Default for AppSettings {
@@ -43,6 +46,7 @@ impl Default for AppSettings {
             jira_enabled: false,
             idle_detection_enabled: true,
             auto_merge_enabled: false,
+            show_unexpected_errors: false,
         }
     }
 }

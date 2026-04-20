@@ -67,6 +67,7 @@ pub fn try_init(data_dir: &Path) -> Result<InitResult> {
         db: Mutex::new(conn),
         monitor: Mutex::new(monitor),
         data_dir: data_dir.to_path_buf(),
+        snoozed_keys: Mutex::new(std::collections::HashMap::new()),
     };
 
     Ok(InitResult { state, monitor_config: config })

@@ -472,6 +472,71 @@ button { cursor: pointer; font-family: inherit; font-size: 13px; border: none; }
   background: #052e1666;
 }
 
+/* Live session card — paused variant */
+.live-session-card--paused {
+  background: #1c1a08;
+  border-color: #854d0e;
+}
+
+.live-pulse--paused {
+  background: var(--yellow);
+  animation: none;
+}
+
+.live-label--paused {
+  color: var(--yellow);
+}
+
+.live-elapsed--paused {
+  color: var(--yellow);
+}
+
+.live-session-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Danger-ghost button variant — red text, no fill */
+.btn-danger-ghost {
+  color: var(--red) !important;
+}
+.btn-danger-ghost:hover {
+  background: #ef444422 !important;
+}
+
+/* ── Stopped session card ─────────────────────────────────────────────────── */
+.stopped-session-card {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 16px;
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.stopped-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.stopped-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
 /* ── Huddle card (Slack call) ─────────────────────────────────────────────── */
 .huddle-card {
   display: flex;
@@ -625,7 +690,14 @@ button { cursor: pointer; font-family: inherit; font-size: 13px; border: none; }
 .review-table td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .review-table tr:last-child td { border-bottom: none; }
 .review-table tr:hover td { background: var(--surface2); }
-.row-published td { opacity: 0.6; }
+.row-published td { opacity: 0.55; }
+.cell-logged { width: 36px; text-align: center; }
+.logged-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--green);
+  cursor: pointer;
+}
 .cell-time { white-space: nowrap; color: var(--text-muted); }
 .cell-branch { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-actions { display: flex; gap: 4px; align-items: center; }

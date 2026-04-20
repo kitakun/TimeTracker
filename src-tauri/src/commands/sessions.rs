@@ -79,3 +79,14 @@ pub fn list_sessions_for_range(
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     session_store::list_sessions_for_range(&conn, &from, &to).map_err(|e| e.to_string())
 }
+
+
+#[tauri::command]
+pub fn set_session_logged(
+    state: State<AppState>,
+    id: String,
+    logged: bool,
+) -> Result<Session, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    session_store::set_session_logged(&conn, &id, logged).map_err(|e| e.to_string())
+}

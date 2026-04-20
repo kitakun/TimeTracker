@@ -138,6 +138,19 @@ export default function AppSettingsPage() {
             </span>
           </label>
         </div>
+        <div className="form-row">
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={settings.show_unexpected_errors}
+              onChange={(e) => setSettings((s) => s ? ({ ...s, show_unexpected_errors: e.target.checked }) : s)}
+            />
+            <span>
+              {t("appSettings.showErrors")}
+              <span className="input-hint">{t("appSettings.showErrorsHint")}</span>
+            </span>
+          </label>
+        </div>
       </div>
 
       {/* ── Tracking ──────────────────────────────────────── */}

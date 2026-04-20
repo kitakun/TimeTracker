@@ -1,7 +1,23 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::process::Command;
+
+/// Spawn `git` with the given arguments and return its output.
+///
+/// On Windows we set `CREATE_NO_WINDOW` (0x0800_0000) so the console window
+/// never briefly flashes on screen. On other platforms this is a plain
+/// `Command::output()` call.
+fn run_git(args: &[&str]) -> std::io::Result<std::process::Output> {
+    let mut cmd = std::process::Command::new("git");
+    cmd.args(args);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW — prevents the console from appearing at all.
+        cmd.creation_flags(0x0800_0000);
+    }
+    cmd.output()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GitInfo {
@@ -42,10 +58,7 @@ pub fn probe(dir: &Path, patterns: &[JiraKeyPattern]) -> GitInfo {
 }
 
 fn find_repo_root(dir: &Path) -> Option<String> {
-    let output = Command::new("git")
-        .args(["-C", dir.to_str()?, "rev-parse", "--show-toplevel"])
-        .output()
-        .ok()?;
+    let output = run_git(&["-C", dir.to_str()?, "rev-parse", "--show-toplevel"]).ok()?;
     if output.status.success() {
         let root = String::from_utf8(output.stdout).ok()?.trim().to_string();
         Some(root)
@@ -55,19 +68,15 @@ fn find_repo_root(dir: &Path) -> Option<String> {
 }
 
 fn get_branch(repo_root: &Path) -> Option<String> {
-    let output = Command::new("git")
-        .args(["-C", repo_root.to_str()?, "symbolic-ref", "--short", "HEAD"])
-        .output()
-        .ok()?;
+    let output =
+        run_git(&["-C", repo_root.to_str()?, "symbolic-ref", "--short", "HEAD"]).ok()?;
     if output.status.success() {
         let branch = String::from_utf8(output.stdout).ok()?.trim().to_string();
         if branch.is_empty() { None } else { Some(branch) }
     } else {
         // Detached HEAD — try to get commit hash
-        let output = Command::new("git")
-            .args(["-C", repo_root.to_str()?, "rev-parse", "--short", "HEAD"])
-            .output()
-            .ok()?;
+        let output =
+            run_git(&["-C", repo_root.to_str()?, "rev-parse", "--short", "HEAD"]).ok()?;
         if output.status.success() {
             let hash = String::from_utf8(output.stdout).ok()?.trim().to_string();
             Some(format!("detached:{}", hash))

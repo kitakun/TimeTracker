@@ -23,13 +23,18 @@ Tracks what you work on automatically — by watching the active window and open
 ## Features
 
 - **Automatic session tracking** — detects the focused window and active IDE project every few seconds.
-- **Automatic session tracking** — detects the focused window and active IDE project every few seconds.
+- **Multi-project tracking** — multiple IDEs open at the same time each get their own independent session.
+- **Branch-aware sessions** — switching git branches automatically closes the current session and starts a new one.
 - **Manual tracking** — start a named timer for anything (code review, meetings, research) directly from the Today page.
 - **Background IDE detection** — keeps tracking even when VS Code / Rider / Cursor / WebStorm is not the focused window.
 - **Git & Jira attribution** — reads the current branch name and extracts the Jira issue key automatically.
 - **Slack Huddle tracking** — optionally records call duration when you are in a Slack Huddle.
 - **Sleep-safe** — detects system wake-up and does not mark sleeping time as idle.
+- **Auto-merge processor** — if the app was closed or the PC slept, the previous session is resumed on restart instead of creating a fragmented one.
 - **Idle detection toggle** — optionally disable automatic idle pausing to track uninterrupted.
+- **Per-session Pause / Stop / Restart** — each live session card has independent Pause and Stop controls. Paused time is excluded from the recorded duration. After stopping, the card stays visible so you can start a new session for that project with one click.
+- **Splashscreen** — a dark-themed loading screen is shown while the UI initialises; no white flash on startup.
+- **Global error notifications** — optional toast alerts for unhandled JS errors (Settings → System → Show unexpected errors).
 - **System tray** — minimizes to tray on close, single instance, click to restore.
 - **Close guard** — warns when closing with active sessions and offers to stop them cleanly.
 - **Review page** — inspect, edit, merge, and selectively publish sessions to Jira; includes a by-issue summary table.
@@ -63,7 +68,7 @@ If you're lazy enough to want automatic worklog publishing:
 
 | Section | What it controls |
 |---|---|
-| **System** | Minimize-to-tray on close |
+| **System** | Minimize-to-tray on close; Auto-merge processor; Show unexpected errors toggle |
 | **Tracking** | Idle detection toggle, idle threshold (default 5 min), poll interval (default 5 s) |
 | **Integrations** | Toggle Slack Huddle tracking on/off |
 | **Boards** | Enable / disable Jira integration; Jira key regex patterns (shown only when enabled) |

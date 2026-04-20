@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { format, subDays } from "date-fns";
 import {
   listMergedSessionsForDay, listProjects, publishWorklog,
-  updateSession, deleteSession, MergedSession, Project
+  updateSession, deleteSession, setSessionLogged, MergedSession, Project
 } from "../lib/tauri";
 import { formatDurationHuman, formatTime, totalDurationSecs } from "../lib/utils";
 import { useI18n } from "../lib/i18n";
@@ -18,7 +18,7 @@ interface IssueGroup {
   isHuddle: boolean;
   totalSecs: number;
   sessionCount: number;
-  publishedCount: number;
+  loggedCount: number;
   projectIds: string[];
 }
 
@@ -46,7 +46,7 @@ function buildIssueGroups(sessions: MergedSession[]): IssueGroup[] {
     if (existing) {
       existing.totalSecs += s.duration_secs;
       existing.sessionCount += 1;
-      if (s.is_published) existing.publishedCount += 1;
+      if (s.is_published) existing.loggedCount += 1;
       if (s.project_id && !existing.projectIds.includes(s.project_id)) {
         existing.projectIds.push(s.project_id);
       }
@@ -57,7 +57,7 @@ function buildIssueGroups(sessions: MergedSession[]): IssueGroup[] {
         isHuddle,
         totalSecs: s.duration_secs,
         sessionCount: 1,
-        publishedCount: s.is_published ? 1 : 0,
+        loggedCount: s.is_published ? 1 : 0,
         projectIds: s.project_id ? [s.project_id] : [],
       });
     }
@@ -127,6 +127,15 @@ export default function Review() {
   async function handleDelete(s: MergedSession) {
     if (!confirm(t("review.deleteConfirm"))) return;
     for (const id of s.session_ids) await deleteSession(id);
+    await reload();
+  }
+
+  // Toggle the "logged" flag on all sessions in a merged group.
+  async function handleToggleLogged(s: MergedSession) {
+    const newVal = !s.is_published;
+    for (const id of s.session_ids) {
+      await setSessionLogged(id, newVal);
+    }
     await reload();
   }
 
@@ -218,8 +227,8 @@ export default function Review() {
                   </thead>
                   <tbody>
                     {issueGroups.map((g) => {
-                      const allPublished = g.publishedCount === g.sessionCount;
-                      const somePublished = g.publishedCount > 0 && !allPublished;
+                      const allLogged = g.loggedCount === g.sessionCount;
+                      const someLogged = g.loggedCount > 0 && !allLogged;
                       return (
                         <tr key={g.displayKey}>
                           <td>
@@ -254,11 +263,11 @@ export default function Review() {
                             <span className="issue-summary-sessions">{g.sessionCount}</span>
                           </td>
                           <td>
-                            {allPublished ? (
-                              <span className="published-badge">{t("review.summaryAllPublished")}</span>
-                            ) : somePublished ? (
+                            {allLogged ? (
+                              <span className="published-badge">{t("review.summaryLogged")}</span>
+                            ) : someLogged ? (
                               <span className="partial-badge">
-                                {t("review.summaryPublished", { done: g.publishedCount, total: g.sessionCount })}
+                                {t("review.summaryPartialLogged", { done: g.loggedCount, total: g.sessionCount })}
                               </span>
                             ) : (
                               <span className="unpublished-badge">{t("review.statusPending")}</span>
@@ -279,13 +288,13 @@ export default function Review() {
               <table className="review-table">
                 <thead>
                   <tr>
+                    <th>{t("review.colLogged")}</th>
                     <th>{t("review.colTime")}</th>
                     <th>{t("review.colDuration")}</th>
                     <th>{t("review.colIssue")}</th>
                     <th>{t("review.colBranch")}</th>
                     <th>{t("review.colProject")}</th>
                     <th>{t("review.colNotes")}</th>
-                    <th>{t("review.colStatus")}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -295,6 +304,15 @@ export default function Review() {
                     const isEditing = editing === i;
                     return (
                       <tr key={i} className={`${s.is_published ? "row-published" : ""} ${s.is_huddle ? "row-huddle" : ""}`}>
+                        <td className="cell-logged">
+                          <input
+                            type="checkbox"
+                            className="logged-checkbox"
+                            checked={s.is_published}
+                            title={s.is_published ? t("review.unloggedTitle") : t("review.loggedTitle")}
+                            onChange={() => handleToggleLogged(s)}
+                          />
+                        </td>
                         <td className="cell-time">
                           {formatTime(s.start_time)}–{s.end_time ? formatTime(s.end_time) : "…"}
                         </td>
@@ -354,13 +372,6 @@ export default function Review() {
                           )}
                         </td>
                         <td>
-                          {s.is_published ? (
-                            <span className="published-badge">{t("review.statusPublished")}</span>
-                          ) : (
-                            <span className="unpublished-badge">{t("review.statusPending")}</span>
-                          )}
-                        </td>
-                        <td>
                           <div className="row-actions">
                             {isEditing ? (
                               <>
@@ -369,20 +380,18 @@ export default function Review() {
                               </>
                             ) : (
                               <>
-                                {!s.is_published && (
-                                  <>
-                                    <button className="btn-icon" title={t("review.titleEdit")} onClick={() => startEdit(i, s)}><Edit2 size={13} /></button>
-                                    <button
-                                      className="btn-icon text-blue"
-                                      title={t("review.titlePublish")}
-                                      disabled={!s.jira_key || publishing[i]}
-                                      onClick={() => handlePublish(i, s)}
-                                    >
-                                      <Send size={13} />
-                                    </button>
-                                    <button className="btn-icon text-red" title={t("review.titleDelete")} onClick={() => handleDelete(s)}><Trash2 size={13} /></button>
-                                  </>
+                                <button className="btn-icon" title={t("review.titleEdit")} onClick={() => startEdit(i, s)}><Edit2 size={13} /></button>
+                                {!s.is_published && s.jira_key && (
+                                  <button
+                                    className="btn-icon text-blue"
+                                    title={t("review.titlePublish")}
+                                    disabled={publishing[i]}
+                                    onClick={() => handlePublish(i, s)}
+                                  >
+                                    <Send size={13} />
+                                  </button>
                                 )}
+                                <button className="btn-icon text-red" title={t("review.titleDelete")} onClick={() => handleDelete(s)}><Trash2 size={13} /></button>
                               </>
                             )}
                           </div>

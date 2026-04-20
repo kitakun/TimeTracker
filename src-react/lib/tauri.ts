@@ -79,6 +79,7 @@ export interface AppSettings {
   jira_enabled: boolean;
   idle_detection_enabled: boolean;
   auto_merge_enabled: boolean;
+  show_unexpected_errors: boolean;
 }
 
 export interface StorageInfo {
@@ -117,6 +118,8 @@ export const updateSession = (
 export const startManualSession = (label: string) =>
   invoke<Session>("start_manual_session", { label });
 export const deleteSession = (id: string) => invoke<void>("delete_session", { id });
+export const setSessionLogged = (id: string, logged: boolean) =>
+  invoke<Session>("set_session_logged", { id, logged });
 export const listSessionsForRange = (from: string, to: string) =>
   invoke<Session[]>("list_sessions_for_range", { from, to });
 
@@ -155,3 +158,23 @@ export const pauseTracking = () => invoke<void>("pause_tracking");
 export const resumeTracking = () => invoke<void>("resume_tracking");
 export const getTrackingState = () => invoke<string>("get_tracking_state");
 export const getCurrentActivity = () => invoke<ActivitySnapshot | null>("get_current_activity");
+
+/// Stop the live auto-tracked session by session ID.
+/// `durationSecs` is the effective duration (real elapsed minus accumulated pause time).
+/// Other concurrently-tracked sessions are unaffected.
+export const stopLiveSession = (
+  sessionId: string,
+  projectId: string,
+  branch: string | null,
+  durationSecs: number,
+) =>
+  invoke<void>("stop_live_session", {
+    session_id: sessionId,
+    project_id: projectId,
+    branch,
+    duration_secs: durationSecs,
+  });
+
+/// Remove the snooze for a (project, branch) pair so tracking can resume.
+export const resumeTrackedProject = (projectId: string, branch: string | null) =>
+  invoke<void>("resume_tracked_project", { project_id: projectId, branch });
